@@ -2,7 +2,7 @@
 /*
 Plugin Name: MilePoint Long-Tail
 Description: Captures Gist AI chats and transforms them into SEO posts.
-Version: 1.0
+Version: 1.1
 Author: pguardiario@gmail.com
 */
 
