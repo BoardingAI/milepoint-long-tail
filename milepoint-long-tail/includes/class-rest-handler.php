@@ -38,7 +38,7 @@ class MP_REST_Handler
       // Sanitize the internal sources array if it exists
       $sources = isset($item['sources']) ? array_map(function ($source) {
         // Defensive guard: Ensure required fields exist
-        if ( ! isset( $source['url'] ) || ! isset( $source['title'] ) ) {
+        if ( empty( $source['url'] ) || empty( $source['title'] ) ) {
           return null;
         }
         return array(
