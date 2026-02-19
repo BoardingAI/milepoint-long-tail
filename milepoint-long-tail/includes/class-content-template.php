@@ -157,6 +157,10 @@ class MP_Content_Template {
             if ( ! empty( $sources ) ) {
                 $html .= '<div class="mp-sources-wrapper">';
                 foreach ( $sources as $source ) {
+                    // Defensive guard: Ensure required keys exist
+                    if ( ! isset( $source['url'] ) || ! isset( $source['title'] ) ) {
+                        continue;
+                    }
                     $original_url = $source['url'];
                     // Resolve the real URL for display purposes (favicons, hostname)
                     $real_url = $this->resolve_source_url($original_url);
