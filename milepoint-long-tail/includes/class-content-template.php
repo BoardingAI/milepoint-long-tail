@@ -19,6 +19,23 @@ class MP_Content_Template {
         return $host ? str_replace( 'www.', '', $host ) : '';
     }
 
+    /**
+     * Helper to extract the real destination URL if it's a Gist redirect
+     */
+    private function resolve_source_url( $url ) {
+        // If it's a Gist redirect, try to parse the doc_url param
+        if ( strpos( $url, 'redirect.gist.ai' ) !== false ) {
+            $parsed = parse_url( $url );
+            if ( isset( $parsed['query'] ) ) {
+                parse_str( $parsed['query'], $query_params );
+                if ( ! empty( $query_params['doc_url'] ) ) {
+                    return $query_params['doc_url'];
+                }
+            }
+        }
+        return $url;
+    }
+
     public function render_qa_view( $content ) {
         if ( get_post_type() !== 'milepoint_qa' || ! is_main_query() ) {
             return $content;
@@ -140,11 +157,20 @@ class MP_Content_Template {
             if ( ! empty( $sources ) ) {
                 $html .= '<div class="mp-sources-wrapper">';
                 foreach ( $sources as $source ) {
-                    $url = esc_url($source['url']);
-                    $host = $this->get_hostname($source['url']);
+                    $original_url = $source['url'];
+                    // Resolve the real URL for display purposes (favicons, hostname)
+                    $real_url = $this->resolve_source_url($original_url);
+
+                    $host = $this->get_hostname($real_url);
                     $favicon = "https://www.google.com/s2/favicons?domain=" . $host . "&sz=32";
 
-                    $html .= '<a class="mp-source-card" href="' . $url . '" target="_blank" rel="noopener noreferrer">';
+                    // Note: We still link to the original URL (which might be the redirect)
+                    // unless the requirement is to bypass the redirect link entirely.
+                    // Usually keeping the tracking link is preferred, but for display we want the real info.
+                    // If the user wants the link to be direct, we can change href to $real_url.
+                    // Assuming for now they just want the *display* fixed as per "where the source name should be... must always be showing the destination source"
+
+                    $html .= '<a class="mp-source-card" href="' . esc_url($original_url) . '" target="_blank" rel="noopener noreferrer">';
 
                     // Header with Icon + Site Name
                     $html .= '  <div class="mp-source-header">';
