@@ -53,6 +53,22 @@ class MP_REST_Handler
 
     $related = $params['related_suggestions'] ?? array();
 
+    // Check for valid sources before proceeding
+    $total_sources = 0;
+    foreach ($transcript as $item) {
+      if (!empty($item['sources']) && is_array($item['sources'])) {
+        foreach ($item['sources'] as $source) {
+          if (!empty($source['url'])) {
+            $total_sources++;
+          }
+        }
+      }
+    }
+
+    if ($total_sources === 0) {
+      return new WP_REST_Response(array('message' => 'Skipped: No sources'), 200);
+    }
+
     // 1. Check if post already exists
     $existing_id = $this->get_post_id_by_thread($thread_id);
 
