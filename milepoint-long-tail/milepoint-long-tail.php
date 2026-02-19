@@ -1,8 +1,8 @@
 <?php
 /*
-Plugin Name: MilePoint Long-Tail
+Plugin Name: MilePoint Long-Tail DEV
 Description: Captures Gist AI chats and transforms them into SEO posts.
-Version: 1.0
+Version: 1.0.1
 Author: pguardiario@gmail.com
 */
 
@@ -35,7 +35,7 @@ function mp_register_qa_cpt() {
         'has_archive' => 'q-and-a', // The directory: milepoint.com/q-and-a/
         'rewrite'     => array('slug' => 'q-and-a'),
         'show_in_rest'       => true, // what does this do?
-        'supports'           => array('title', 'editor', 'excerpt', 'custom-fields'),
+        'supports'           => array('title', 'editor', 'excerpt', 'custom-fields', 'thumbnail'),
         'menu_icon'          => 'dashicons-format-chat',
     ));
 }
