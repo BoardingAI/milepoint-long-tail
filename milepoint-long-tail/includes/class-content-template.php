@@ -26,7 +26,7 @@ class MP_Content_Template {
 
         $transcript = get_post_meta( get_the_ID(), '_raw_transcript', true );
         $related    = get_post_meta( get_the_ID(), '_related_suggestions', true );
-        $post_title = get_the_title();
+        // Removed unused $post_title
 
         if ( ! is_array( $transcript ) ) {
             return $content;
@@ -144,7 +144,7 @@ class MP_Content_Template {
                     $host = $this->get_hostname($source['url']);
                     $favicon = "https://www.google.com/s2/favicons?domain=" . $host . "&sz=32";
 
-                    $html .= '<a class="mp-source-card" href="' . $url . '" target="_blank">';
+                    $html .= '<a class="mp-source-card" href="' . $url . '" target="_blank" rel="noopener noreferrer">';
 
                     // Header with Icon + Site Name
                     $html .= '  <div class="mp-source-header">';
@@ -176,7 +176,7 @@ class MP_Content_Template {
             foreach ( $related as $q ) {
                 $clean_q = $this->clean_lit_comments($q);
                 $html .= '<div style="color: #0073aa; font-size: 1.1rem; padding: 16px 20px; background: #fff; border: 1px solid #f0f0f0; border-radius: 8px;">';
-                $html .= '  <span style="margin-right: 12px; color: #0073aa; opacity: 0.4; font-weight: bold;">→</span> ' . $clean_q;
+                $html .= '  <span style="margin-right: 12px; color: #0073aa; opacity: 0.4; font-weight: bold;">→</span> ' . esc_html( $clean_q );
                 $html .= '</div>';
             }
 

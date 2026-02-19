@@ -51,7 +51,10 @@ class MP_REST_Handler
       );
     }, $params['full_transcript'] ?? array());
 
-    $related = $params['related_suggestions'] ?? array();
+    // Fix: Sanitize each related suggestion individually
+    $related = isset($params['related_suggestions']) && is_array($params['related_suggestions'])
+        ? array_map('sanitize_text_field', $params['related_suggestions'])
+        : array();
 
     // Check for valid sources before proceeding
     $total_sources = 0;
