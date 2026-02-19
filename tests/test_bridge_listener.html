@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test Bridge Listener</title>
+</head>
+<body>
+    <h1>Test Bridge Listener</h1>
+    <p>Open this file with ?q=Test+Query to test.</p>
+    <div id="prompt-host">
+        <gist-chat-prompt></gist-chat-prompt>
+    </div>
+
+    <script>
+        // Mock Custom Element Behavior
+        class GistChatPrompt extends HTMLElement {
+            constructor() {
+                super();
+                this.attachShadow({mode: 'open'});
+                this.shadowRoot.innerHTML = `
+                    <div class="wrapper">
+                        <div class="inner">
+                            <div class="input-container">
+                                <textarea id="chat-input"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        customElements.define('gist-chat-prompt', GistChatPrompt);
+
+        // Mock mpData
+        window.mpData = {
+            rest_url: '/mock-api',
+            nonce: '123'
+        };
+    </script>
+
+    <!-- Load the script to be tested -->
+    <script src="../milepoint-long-tail/assets/js/bridge-listener.js"></script>
+
+    <script>
+        // Verify result after a delay
+        setTimeout(() => {
+            const el = document.querySelector('gist-chat-prompt');
+            const textarea = el.shadowRoot.querySelector('textarea');
+            console.log("Textarea value:", textarea.value);
+
+            const params = new URLSearchParams(window.location.search);
+            const expected = params.get('q');
+
+            if (expected && textarea.value === expected) {
+                document.body.style.backgroundColor = "lightgreen";
+                document.body.innerHTML += "<h1>PASS: Value matches '" + expected + "'</h1>";
+            } else if (!expected) {
+                document.body.style.backgroundColor = "lightyellow";
+                document.body.innerHTML += "<h1>WARN: No ?q= parameter provided.</h1>";
+            } else {
+                document.body.style.backgroundColor = "lightcoral";
+                document.body.innerHTML += "<h1>FAIL: Expected '" + expected + "', got '" + textarea.value + "'</h1>";
+            }
+        }, 2000);
+    </script>
+</body>
+</html>

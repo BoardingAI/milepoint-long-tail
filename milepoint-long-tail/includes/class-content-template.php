@@ -205,9 +205,11 @@ class MP_Content_Template {
 
             foreach ( $related as $q ) {
                 $clean_q = $this->clean_lit_comments($q);
-                $html .= '<div style="color: #0073aa; font-size: 1.1rem; padding: 16px 20px; background: #fff; border: 1px solid #f0f0f0; border-radius: 8px;">';
+                $link_url = '/chat/?q=' . urlencode( $clean_q );
+
+                $html .= '<a href="' . esc_url( $link_url ) . '" style="display: block; text-decoration: none; color: #0073aa; font-size: 1.1rem; padding: 16px 20px; background: #fff; border: 1px solid #f0f0f0; border-radius: 8px; transition: background-color 0.2s;">';
                 $html .= '  <span style="margin-right: 12px; color: #0073aa; opacity: 0.4; font-weight: bold;">→</span> ' . esc_html( $clean_q );
-                $html .= '</div>';
+                $html .= '</a>';
             }
 
             $html .= '  </div>';
