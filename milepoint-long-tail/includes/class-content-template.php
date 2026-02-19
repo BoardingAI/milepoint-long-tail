@@ -14,6 +14,28 @@ class MP_Content_Template {
         return preg_replace('/<!--(.*?)-->/s', '', $string);
     }
 
+    private function get_hostname( $url ) {
+        $host = parse_url( $url, PHP_URL_HOST );
+        return $host ? str_replace( 'www.', '', $host ) : '';
+    }
+
+    /**
+     * Helper to extract the real destination URL if it's a Gist redirect
+     */
+    private function resolve_source_url( $url ) {
+        // If it's a Gist redirect, try to parse the doc_url param
+        if ( strpos( $url, 'redirect.gist.ai' ) !== false ) {
+            $parsed = parse_url( $url );
+            if ( isset( $parsed['query'] ) ) {
+                parse_str( $parsed['query'], $query_params );
+                if ( ! empty( $query_params['doc_url'] ) ) {
+                    return $query_params['doc_url'];
+                }
+            }
+        }
+        return $url;
+    }
+
     public function render_qa_view( $content ) {
         if ( get_post_type() !== 'milepoint_qa' || ! is_main_query() ) {
             return $content;
@@ -21,7 +43,7 @@ class MP_Content_Template {
 
         $transcript = get_post_meta( get_the_ID(), '_raw_transcript', true );
         $related    = get_post_meta( get_the_ID(), '_related_suggestions', true );
-        $post_title = get_the_title();
+        // Removed unused $post_title
 
         if ( ! is_array( $transcript ) ) {
             return $content;
@@ -39,24 +61,77 @@ class MP_Content_Template {
             }
             .mp-qa-row:first-child .mp-q { margin-top: 0; }
 
+            /* Sources Carousel */
+            .mp-sources-wrapper {
+                margin-top: 30px;
+                display: flex;
+                overflow-x: auto;
+                gap: 15px;
+                padding-bottom: 15px;
+                scroll-snap-type: x mandatory;
+                -webkit-overflow-scrolling: touch;
+            }
+            /* Scrollbar styling */
+            .mp-sources-wrapper::-webkit-scrollbar { height: 8px; }
+            .mp-sources-wrapper::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+            .mp-sources-wrapper::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+            .mp-sources-wrapper::-webkit-scrollbar-thumb:hover { background: #aaa; }
+
             .mp-source-card {
-                margin-top: 20px;
-                padding: 15px 20px;
+                flex: 0 0 280px;
+                scroll-snap-align: start;
                 background: #fdfdfd;
-                border-left: 3px solid #ddd;
-                font-size: 0.95rem;
+                border: 1px solid #e0e0e0;
+                border-radius: 8px;
+                padding: 15px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                transition: transform 0.2s, box-shadow 0.2s;
+                text-decoration: none;
+            }
+            .mp-source-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            }
+            .mp-source-header {
+                display: flex;
+                align-items: center;
+                margin-bottom: 10px;
+            }
+            .mp-source-icon {
+                width: 20px;
+                height: 20px;
+                margin-right: 8px;
+                border-radius: 4px;
+            }
+            .mp-source-site-name {
+                font-size: 0.85rem;
+                color: #666;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
             }
             .mp-source-title {
-                display: block;
+                display: -webkit-box;
                 font-weight: bold;
                 color: #0073aa;
-                text-decoration: none;
-                margin-bottom: 5px;
+                margin-bottom: 8px;
+                line-height: 1.3;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+                font-size: 1rem;
             }
             .mp-source-excerpt {
-                color: #666;
-                line-height: 1.5;
-                font-style: italic;
+                color: #555;
+                line-height: 1.4;
+                font-size: 0.9rem;
+                display: -webkit-box;
+                -webkit-line-clamp: 3;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
             }
         </style>';
 
@@ -76,26 +151,50 @@ class MP_Content_Template {
             // ANSWER BOX
             $html .= '  <div class="mp-a" style="border-left: 4px solid #0073aa; padding: 0 0 0 30px; margin-left: 2px; color: #444; line-height: 1.8; font-size: 1.15rem;">';
             $html .=      $answer;
-
-            // ???
-            // $html .= 'sources: ' . count($sources)  ;
+            $html .= '  </div>'; // Close Answer Box
 
             // Sources list
             if ( ! empty( $sources ) ) {
-                $html .= '<div class="mp-sources-wrapper" style="margin-top: 30px;">';
+                $html .= '<div class="mp-sources-wrapper">';
                 foreach ( $sources as $source ) {
-                    $html .= '<div class="mp-source-card">';
-                    $html .= '  <a class="mp-source-title" href="' . esc_url($source['url']) . '" target="_blank">' . esc_html($source['title']) . '</a>';
-                    if ( ! empty( $source['excerpt'] ) ) {
-                        $html .= '  <div class="mp-source-excerpt">"' . esc_html($source['excerpt']) . '..."</div>';
+                    // Defensive guard: Ensure required keys exist
+                    if ( ! isset( $source['url'] ) || ! isset( $source['title'] ) ) {
+                        continue;
                     }
-                    $html .= '</div>';
+                    $original_url = $source['url'];
+                    // Resolve the real URL for display purposes (favicons, hostname)
+                    $real_url = $this->resolve_source_url($original_url);
+
+                    $host = $this->get_hostname($real_url);
+                    $favicon = "https://www.google.com/s2/favicons?domain=" . $host . "&sz=32";
+
+                    // Note: We still link to the original URL (which might be the redirect)
+                    // unless the requirement is to bypass the redirect link entirely.
+                    // Usually keeping the tracking link is preferred, but for display we want the real info.
+                    // If the user wants the link to be direct, we can change href to $real_url.
+                    // Assuming for now they just want the *display* fixed as per "where the source name should be... must always be showing the destination source"
+
+                    $html .= '<a class="mp-source-card" href="' . esc_url($original_url) . '" target="_blank" rel="noopener noreferrer">';
+
+                    // Header with Icon + Site Name
+                    $html .= '  <div class="mp-source-header">';
+                    $html .= '    <img src="' . esc_url($favicon) . '" class="mp-source-icon" alt="">';
+                    $html .= '    <span class="mp-source-site-name">' . esc_html($host) . '</span>';
+                    $html .= '  </div>';
+
+                    // Title
+                    $html .= '  <div class="mp-source-title">' . esc_html($source['title']) . '</div>';
+
+                    // Excerpt
+                    if ( ! empty( $source['excerpt'] ) ) {
+                        $html .= '  <div class="mp-source-excerpt">' . esc_html($source['excerpt']) . '</div>';
+                    }
+                    $html .= '</a>';
                 }
                 $html .= '</div>';
             }
 
-            $html .= '  </div>';
-            $html .= '</div>';
+            $html .= '</div>'; // Close Row
         }
 
         // Related Questions
@@ -107,7 +206,7 @@ class MP_Content_Template {
             foreach ( $related as $q ) {
                 $clean_q = $this->clean_lit_comments($q);
                 $html .= '<div style="color: #0073aa; font-size: 1.1rem; padding: 16px 20px; background: #fff; border: 1px solid #f0f0f0; border-radius: 8px;">';
-                $html .= '  <span style="margin-right: 12px; color: #0073aa; opacity: 0.4; font-weight: bold;">→</span> ' . $clean_q;
+                $html .= '  <span style="margin-right: 12px; color: #0073aa; opacity: 0.4; font-weight: bold;">→</span> ' . esc_html( $clean_q );
                 $html .= '</div>';
             }
 

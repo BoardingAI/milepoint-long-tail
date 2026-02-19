@@ -37,12 +37,19 @@ class MP_REST_Handler
     $transcript = array_map(function ($item) {
       // Sanitize the internal sources array if it exists
       $sources = isset($item['sources']) ? array_map(function ($source) {
+        // Defensive guard: Ensure required fields exist
+        if ( empty( $source['url'] ) || empty( $source['title'] ) ) {
+          return null;
+        }
         return array(
           'url'     => esc_url_raw($source['url']),
           'title'   => sanitize_text_field($source['title']),
           'excerpt' => wp_kses_post($source['excerpt'])
         );
       }, $item['sources']) : array();
+
+      // Filter out null values from incomplete entries
+      $sources = array_filter( $sources );
 
       return array(
         'question' => wp_kses_post($item['question']),
@@ -51,7 +58,10 @@ class MP_REST_Handler
       );
     }, $params['full_transcript'] ?? array());
 
-    $related = $params['related_suggestions'] ?? array();
+    // Fix: Sanitize each related suggestion individually
+    $related = isset($params['related_suggestions']) && is_array($params['related_suggestions'])
+        ? array_map('sanitize_text_field', $params['related_suggestions'])
+        : array();
 
     // Check for valid sources before proceeding
     $total_sources = 0;
