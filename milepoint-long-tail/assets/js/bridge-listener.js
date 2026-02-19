@@ -125,53 +125,74 @@
     if (!query) return;
 
     let attempts = 0;
-    const maxAttempts = 20; // 10 seconds
+    const maxAttempts = 120; // 30 seconds (250ms interval)
 
     const interval = setInterval(() => {
       attempts++;
       let textarea = null;
+      let shadowRoot = null;
 
-      // Try locating textarea in Light DOM or Shadow DOM
+      // 1. Try finding the host element
+      // User provided XPath: //*[@id="boarding-area-widget-1"]//div/div[2]/gist-chat-prompt
+      // We'll search for 'gist-chat-prompt' globally first as it's a custom element
       const host = document.querySelector('gist-chat-prompt');
+
       if (host) {
+        // console.log("MilePoint Bridge: Found host element <gist-chat-prompt>");
         if (host.shadowRoot) {
-            textarea = host.shadowRoot.querySelector('textarea');
-            if (!textarea) {
-                // Try specific path provided: div > div > div > textarea
-                textarea = host.shadowRoot.querySelector('div > div > div > textarea');
-            }
+            shadowRoot = host.shadowRoot;
+            // 2. Try finding the textarea inside Shadow DOM
+            // User provided path: div > div > div > textarea
+            // Also trying broad 'textarea' selector
+            textarea = shadowRoot.querySelector('textarea.textarea') ||
+                       shadowRoot.querySelector('textarea') ||
+                       shadowRoot.querySelector('div > div > div > textarea');
         } else {
+            // Fallback for light DOM or if shadow is closed (unlikely for this widget)
             textarea = host.querySelector('textarea');
         }
       }
 
-      // Fallback: direct global search if component name differs or structure is flat
+      // 3. Fallback: Specific parent container search if global tag fails
       if (!textarea) {
-          textarea = document.querySelector('#prompt-host textarea');
+          const widgetContainer = document.querySelector('#boarding-area-widget-1');
+          if (widgetContainer) {
+              const nestedHost = widgetContainer.querySelector('gist-chat-prompt');
+              if (nestedHost && nestedHost.shadowRoot) {
+                  textarea = nestedHost.shadowRoot.querySelector('textarea');
+              }
+          }
       }
 
-
       if (textarea) {
-        console.log("MilePoint Bridge: Found chat input, pre-filling...");
+        console.log("MilePoint Bridge: Found chat input, pre-filling with:", query);
 
         // Set value
         textarea.value = query;
 
-        // Dispatch events to trigger framework bindings
-        textarea.dispatchEvent(new Event('input', { bubbles: true }));
-        textarea.dispatchEvent(new Event('change', { bubbles: true }));
+        // Dispatch events to trigger framework bindings (React/Vue/etc often need 'input')
+        textarea.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+        textarea.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
 
-        // Auto-resize
+        // Try focusing to ensure visual update
+        textarea.focus();
+
+        // Auto-resize logic (often handled by component, but good to trigger)
         if (textarea.scrollHeight > textarea.clientHeight) {
             textarea.style.height = textarea.scrollHeight + 'px';
         }
 
         clearInterval(interval);
-      } else if (attempts >= maxAttempts) {
-        console.log("MilePoint Bridge: Could not find chat input after 10s.");
-        clearInterval(interval);
+      } else {
+        if (attempts % 20 === 0) {
+            console.log(`MilePoint Bridge: Waiting for chat input... (${attempts}/${maxAttempts})`);
+        }
+        if (attempts >= maxAttempts) {
+            console.error("MilePoint Bridge: Could not find chat input after 30s.");
+            clearInterval(interval);
+        }
       }
-    }, 500);
+    }, 250);
   };
 
   prefillChat();
