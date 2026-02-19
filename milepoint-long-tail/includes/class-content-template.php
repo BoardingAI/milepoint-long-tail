@@ -14,6 +14,11 @@ class MP_Content_Template {
         return preg_replace('/<!--(.*?)-->/s', '', $string);
     }
 
+    private function get_hostname( $url ) {
+        $host = parse_url( $url, PHP_URL_HOST );
+        return $host ? str_replace( 'www.', '', $host ) : '';
+    }
+
     public function render_qa_view( $content ) {
         if ( get_post_type() !== 'milepoint_qa' || ! is_main_query() ) {
             return $content;
@@ -39,24 +44,77 @@ class MP_Content_Template {
             }
             .mp-qa-row:first-child .mp-q { margin-top: 0; }
 
+            /* Sources Carousel */
+            .mp-sources-wrapper {
+                margin-top: 30px;
+                display: flex;
+                overflow-x: auto;
+                gap: 15px;
+                padding-bottom: 15px;
+                scroll-snap-type: x mandatory;
+                -webkit-overflow-scrolling: touch;
+            }
+            /* Scrollbar styling */
+            .mp-sources-wrapper::-webkit-scrollbar { height: 8px; }
+            .mp-sources-wrapper::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+            .mp-sources-wrapper::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
+            .mp-sources-wrapper::-webkit-scrollbar-thumb:hover { background: #aaa; }
+
             .mp-source-card {
-                margin-top: 20px;
-                padding: 15px 20px;
+                flex: 0 0 280px;
+                scroll-snap-align: start;
                 background: #fdfdfd;
-                border-left: 3px solid #ddd;
-                font-size: 0.95rem;
+                border: 1px solid #e0e0e0;
+                border-radius: 8px;
+                padding: 15px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                transition: transform 0.2s, box-shadow 0.2s;
+                text-decoration: none;
+            }
+            .mp-source-card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            }
+            .mp-source-header {
+                display: flex;
+                align-items: center;
+                margin-bottom: 10px;
+            }
+            .mp-source-icon {
+                width: 20px;
+                height: 20px;
+                margin-right: 8px;
+                border-radius: 4px;
+            }
+            .mp-source-site-name {
+                font-size: 0.85rem;
+                color: #666;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
             }
             .mp-source-title {
-                display: block;
+                display: -webkit-box;
                 font-weight: bold;
                 color: #0073aa;
-                text-decoration: none;
-                margin-bottom: 5px;
+                margin-bottom: 8px;
+                line-height: 1.3;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+                font-size: 1rem;
             }
             .mp-source-excerpt {
-                color: #666;
-                line-height: 1.5;
-                font-style: italic;
+                color: #555;
+                line-height: 1.4;
+                font-size: 0.9rem;
+                display: -webkit-box;
+                -webkit-line-clamp: 3;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
             }
         </style>';
 
@@ -76,26 +134,37 @@ class MP_Content_Template {
             // ANSWER BOX
             $html .= '  <div class="mp-a" style="border-left: 4px solid #0073aa; padding: 0 0 0 30px; margin-left: 2px; color: #444; line-height: 1.8; font-size: 1.15rem;">';
             $html .=      $answer;
-
-            // ???
-            // $html .= 'sources: ' . count($sources)  ;
+            $html .= '  </div>'; // Close Answer Box
 
             // Sources list
             if ( ! empty( $sources ) ) {
-                $html .= '<div class="mp-sources-wrapper" style="margin-top: 30px;">';
+                $html .= '<div class="mp-sources-wrapper">';
                 foreach ( $sources as $source ) {
-                    $html .= '<div class="mp-source-card">';
-                    $html .= '  <a class="mp-source-title" href="' . esc_url($source['url']) . '" target="_blank">' . esc_html($source['title']) . '</a>';
+                    $url = esc_url($source['url']);
+                    $host = $this->get_hostname($source['url']);
+                    $favicon = "https://www.google.com/s2/favicons?domain=" . $host . "&sz=32";
+
+                    $html .= '<a class="mp-source-card" href="' . $url . '" target="_blank">';
+
+                    // Header with Icon + Site Name
+                    $html .= '  <div class="mp-source-header">';
+                    $html .= '    <img src="' . esc_url($favicon) . '" class="mp-source-icon" alt="">';
+                    $html .= '    <span class="mp-source-site-name">' . esc_html($host) . '</span>';
+                    $html .= '  </div>';
+
+                    // Title
+                    $html .= '  <div class="mp-source-title">' . esc_html($source['title']) . '</div>';
+
+                    // Excerpt
                     if ( ! empty( $source['excerpt'] ) ) {
-                        $html .= '  <div class="mp-source-excerpt">"' . esc_html($source['excerpt']) . '..."</div>';
+                        $html .= '  <div class="mp-source-excerpt">' . esc_html($source['excerpt']) . '</div>';
                     }
-                    $html .= '</div>';
+                    $html .= '</a>';
                 }
                 $html .= '</div>';
             }
 
-            $html .= '  </div>';
-            $html .= '</div>';
+            $html .= '</div>'; // Close Row
         }
 
         // Related Questions
