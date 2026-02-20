@@ -193,11 +193,20 @@ class MP_Content_Template
       $html .= "</div>";
     }
 
-    // Force load the comments template if comments are open
-    if ((comments_open() || get_comments_number()) && post_type_supports(get_post_type(), 'comments')) {
+    // Force load the comments template if comments are open (Restricted to single QA view)
+    if (is_singular('milepoint_qa') && (comments_open() || get_comments_number()) && post_type_supports(get_post_type(), 'comments')) {
+      $html .= '<div id="mp-qa-comments-wrapper" style="margin-top: 60px; padding-top: 40px; border-top: 1px solid #eee;">';
+
+      // Debug info to help troubleshoot visibility issues
+      if (defined('WP_DEBUG') && WP_DEBUG) {
+          $html .= '<!-- MP_DEBUG: Comments Open: ' . (comments_open() ? 'Yes' : 'No') . ' | Logged In: ' . (is_user_logged_in() ? 'Yes' : 'No') . ' -->';
+      }
+
       ob_start();
       comments_template();
       $html .= ob_get_clean();
+
+      $html .= '</div>';
     }
 
     $html .= "</div>";
