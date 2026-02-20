@@ -37,7 +37,14 @@ function mp_register_qa_cpt()
     "has_archive" => "q-and-a", // The directory: milepoint.com/q-and-a/
     "rewrite" => ["slug" => "q-and-a"],
     "show_in_rest" => true, // what does this do?
-    "supports" => ["title", "editor", "excerpt", "custom-fields", "thumbnail"],
+    "supports" => [
+      "title",
+      "editor",
+      "excerpt",
+      "custom-fields",
+      "thumbnail",
+      "comments",
+    ],
     "menu_icon" => "dashicons-format-chat",
   ]);
 }
