@@ -193,6 +193,13 @@ class MP_Content_Template
       $html .= "</div>";
     }
 
+    // Force load the comments template if comments are open
+    if ((comments_open() || get_comments_number()) && post_type_supports(get_post_type(), 'comments')) {
+      ob_start();
+      comments_template();
+      $html .= ob_get_clean();
+    }
+
     $html .= "</div>";
 
     return $html;
