@@ -9,6 +9,27 @@ class MP_Content_Template
   public function __construct()
   {
     add_filter("the_content", [$this, "render_qa_view"]);
+    add_action("wp_enqueue_scripts", [$this, "enqueue_assets"]);
+  }
+
+  public function enqueue_assets()
+  {
+    // Only load these files on the single Q&A post pages
+    if (is_singular("milepoint_qa")) {
+      wp_enqueue_style(
+        "mp-qa-style",
+        plugins_url("../assets/css/mp-qa.css", __FILE__),
+        [],
+        "1.0.4",
+      );
+      wp_enqueue_script(
+        "mp-qa-hover",
+        plugins_url("../assets/js/mp-qa-hover.js", __FILE__),
+        [],
+        "1.0.4",
+        true, // Load in footer
+      );
+    }
   }
 
   private function clean_lit_comments($string)
@@ -59,114 +80,16 @@ class MP_Content_Template
     }
 
     // fix hierarchy and style sources
-    $html = '<style>
-            .single-milepoint_qa .entry-title { display: none !important; }
-            .mp-qa-container { margin-top: 50px; }
-            .mp-a h1, .mp-a h2, .mp-a h3, .mp-a h4 {
-                font-size: 1.35rem !important;
-                margin: 30px 0 15px 0 !important;
-                color: #111 !important;
-                font-weight: 700 !important;
-            }
-            .mp-qa-row:first-child .mp-q { margin-top: 0; }
 
-            /* Sources Carousel */
-            .mp-sources-wrapper {
-                margin-top: 30px;
-                display: flex;
-                overflow-x: auto;
-                gap: 15px;
-                padding-bottom: 15px;
-                scroll-snap-type: x mandatory;
-                -webkit-overflow-scrolling: touch;
-            }
-            /* Scrollbar styling */
-            .mp-sources-wrapper::-webkit-scrollbar { height: 8px; }
-            .mp-sources-wrapper::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
-            .mp-sources-wrapper::-webkit-scrollbar-thumb { background: #ccc; border-radius: 4px; }
-            .mp-sources-wrapper::-webkit-scrollbar-thumb:hover { background: #aaa; }
-
-            .mp-source-card {
-                flex: 0 0 280px;
-                scroll-snap-align: start;
-                background: #fdfdfd;
-                border: 1px solid #e0e0e0;
-                border-radius: 8px;
-                padding: 15px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-                display: flex;
-                flex-direction: column;
-                justify-content: space-between;
-                transition: transform 0.2s, box-shadow 0.2s;
-                text-decoration: none;
-            }
-            .mp-source-card:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            }
-            .mp-source-header {
-                display: flex;
-                align-items: center;
-                margin-bottom: 10px;
-            }
-            .mp-source-icon {
-                width: 20px;
-                height: 20px;
-                margin-right: 8px;
-                border-radius: 4px;
-            }
-            .mp-source-site-name {
-                font-size: 0.85rem;
-                color: #666;
-                font-weight: 600;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-            }
-            .mp-source-title {
-                display: -webkit-box;
-                font-weight: bold;
-                color: #0073aa;
-                margin-bottom: 8px;
-                line-height: 1.3;
-                -webkit-line-clamp: 2;
-                -webkit-box-orient: vertical;
-                overflow: hidden;
-                font-size: 1rem;
-            }
-            .mp-source-excerpt {
-                color: #555;
-                line-height: 1.4;
-                font-size: 0.9rem;
-                display: -webkit-box;
-                -webkit-line-clamp: 3;
-                -webkit-box-orient: vertical;
-                overflow: hidden;
-            }
-            .gist-chat-citation:hover {
-                background: var(--gist-color-action-primary, #000000);
-                color: var(--gist-color-on-action, #ffffff);
-                border-color: var(--gist-color-action-primary, #000000);
-            }
-            .gist-chat-citation {
-                position: relative;
-                top: -2px;
-                vertical-align: middle;
-                cursor: pointer;
-                color: var(--gist-color-text-primary, #1f2937);
-                font-weight: var(--gist-font-weight-light, 300);
-                font-size: var(--gist-font-size-xxs, 8px);
-                line-height: 1.3;
-                padding: 2px 6px;
-                border-radius: 1em;
-                background-color: var(--gist-color-surface-inset, #F2F2F2);
-                transition: all 0.2s ease;
-                margin-left: 4.5px;
-                border: 1px solid var(--gist-color-border-default, #e5e7eb);
-            }
-        </style>';
+    $html = '<div id="mp-hover-card">Testing 123</div>';
 
     $html .=
       '<div class="mp-qa-container" style="max-width: 800px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;">';
+    // let's add the content as a json object so we can inspect it later
+    $html .=
+      '<script type="application/json" id="mp-qa-content">' .
+      json_encode($transcript) .
+      "</script>";
 
     foreach ($transcript as $item) {
       $question = $this->clean_lit_comments($item["question"]);

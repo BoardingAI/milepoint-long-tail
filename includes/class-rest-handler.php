@@ -46,6 +46,8 @@ class MP_REST_Handler
           return [
             "url" => esc_url_raw($source["url"]),
             "title" => sanitize_text_field($source["title"]),
+            "source" => sanitize_text_field($source["source"]),
+            "favicon" => esc_url_raw($source["favicon"]),
             "excerpt" => wp_kses_post($source["excerpt"]),
           ];
         }, $item["sources"])

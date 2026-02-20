@@ -60,6 +60,10 @@ function getDeepFlattenedClone(node) {
         );
         sources = Array.from(cards).map((card) => ({
           url: card.href,
+          source:
+            card.querySelector(".gist-citation-source")?.innerText.trim() ||
+            "Unknown",
+          favicon: card.querySelector(".gist-citation-favicon img")?.src,
           title:
             card.querySelector(".gist-citation-card-title")?.innerText.trim() ||
             "View Source",
