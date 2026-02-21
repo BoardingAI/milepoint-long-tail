@@ -88,6 +88,7 @@ single-milepoint_qa .entry-title {
   margin-bottom: 8px;
   line-height: 1.3;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   font-size: 1rem;
@@ -98,6 +99,7 @@ single-milepoint_qa .entry-title {
   font-size: 0.9rem;
   display: -webkit-box;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -197,6 +199,7 @@ single-milepoint_qa .entry-title {
   margin-bottom: 8px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -206,6 +209,7 @@ single-milepoint_qa .entry-title {
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -220,3 +224,20 @@ single-milepoint_qa .entry-title {
   border-style: solid;
   border-color: white transparent transparent transparent;
 }
+
+/*admin page*/
+.mp-api-key-container {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.mp-api-key-container input[type="password"],
+.mp-api-key-container input[type="text"] {
+  margin-bottom: 0;
+}
+
+.mp-api-key-container .dashicons {
+  margin-top: 4px;
+}
+

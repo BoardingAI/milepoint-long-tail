@@ -2,6 +2,41 @@
  * MilePoint Long-Tail Bridge - Clean Polling Version
  */
 // assets/js/bridge-listener.js
+function getBreakdown() {
+  const widget = document.querySelector("gist-chat-widget");
+  const shadow = widget?.shadowRoot;
+  if (!shadow) return;
+
+  const attributionBar = shadow.querySelector("gist-attribution-bar");
+  let breakdown = [];
+  if (attributionBar && attributionBar.shadowRoot) {
+    // Query inside the shadow root for each column
+    const columns = attributionBar.shadowRoot.querySelectorAll(".col");
+
+    breakdown = Array.from(columns).map((col) => {
+      const labelSpan = col.querySelector(".label");
+
+      // The percentage is inside the <b> tag
+      const percentage = labelSpan.querySelector("b")?.innerText.trim() || "";
+
+      // The source name is the text node after the <b> tag
+      // We clone the node and remove the <b> to get just the clean source name
+      const labelClone = labelSpan.cloneNode(true);
+      const bTag = labelClone.querySelector("b");
+      if (bTag) bTag.remove();
+      const sourceName = labelClone.innerText.trim();
+
+      return {
+        source: sourceName,
+        percentage: Number(percentage.replace("%", "") || 0),
+      };
+    });
+  } else {
+    console.log("Attribution bar or Shadow Root not found.");
+  }
+  return breakdown;
+}
+
 function getDeepFlattenedClone(node) {
   // 1. Handle text and comments directly
   if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.COMMENT_NODE) {
@@ -127,6 +162,7 @@ function getDeepFlattenedClone(node) {
       const payload = {
         thread_id: threadId,
         full_transcript: transcript, // Now contains .sources for each entry
+        breakdown: getBreakdown(),
         related_suggestions: related,
       };
 

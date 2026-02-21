@@ -1,0 +1,280 @@
+/* hub page */
+
+.mp-hub-wrapper { max-width: 1200px; margin: 40px auto; padding: 0 20px; }
+.mp-hub-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
+
+/* Filter Pills */
+.mp-filter-group a {
+    padding: 8px 16px; border: 1px solid #ddd; border-radius: 20px;
+    text-decoration: none; color: #666; font-size: 14px; margin-right: 10px;
+}
+.mp-filter-group a.active { background: #0073aa; color: white; border-color: #0073aa; }
+
+/* The Modern Grid */
+.mp-hub-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 30px;
+}
+.mp-hub-card {
+    background: white; border-radius: 12px; overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05); transition: transform 0.3s ease;
+    display: flex; flex-direction: column;
+}
+.mp-hub-card:hover { transform: translateY(-5px); }
+
+.mp-card-image { position: relative; height: 200px; display: block; overflow: hidden; }
+.mp-card-image img { width: 100%; height: 100%; object-fit: cover; transition: scale 0.5s ease; }
+.mp-hub-card:hover img { scale: 1.05; }
+
+.hot-badge {
+    position: absolute; top: 15px; right: 15px; background: #ff4757;
+    color: white; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 11px;
+}
+
+.mp-card-content { padding: 20px; flex-grow: 1; }
+.mp-card-cat { color: #0073aa; font-weight: bold; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+.mp-card-content h3 { margin: 10px 0; font-size: 1.25rem; line-height: 1.4; }
+.mp-card-content h3 a { color: #222; text-decoration: none; }
+
+/* Hub Header Adjustments */
+.mp-header-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+}
+
+/* Filter Bar */
+.mp-filter-bar {
+    display: flex;
+    align-items: center;
+    background: #f9fafb;
+    padding: 12px 20px;
+    border-radius: 50px;
+    border: 1px solid #eee;
+    margin-bottom: 40px;
+}
+
+.mp-filter-label {
+    font-weight: 700;
+    font-size: 13px;
+    color: #9ca3af;
+    text-transform: uppercase;
+    margin-right: 15px;
+    white-space: nowrap;
+}
+
+.mp-tags-container {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    scrollbar-width: none; /* Hide scrollbar Firefox */
+    -ms-overflow-style: none; /* Hide scrollbar IE */
+}
+.mp-tags-container::-webkit-scrollbar { display: none; } /* Hide scrollbar Chrome/Safari */
+
+/* Tag Pills */
+.mp-tag-pill {
+    white-space: nowrap;
+    padding: 6px 16px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 20px;
+    font-size: 14px;
+    color: #4b5563;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.mp-tag-pill:hover {
+    border-color: #0073aa;
+    color: #0073aa;
+}
+
+.mp-tag-pill.active {
+    background: #0073aa;
+    color: #fff;
+    border-color: #0073aa;
+}
+
+.mp-tag-secondary {
+    color: #6b7280;
+    font-size: 13px;
+    background: transparent;
+    border-style: dashed;
+}
+
+/* Sort Buttons (The ones in your screenshot) */
+.mp-sort-btn {
+    display: inline-block;
+    padding: 8px 20px;
+    border-radius: 30px;
+    text-decoration: none;
+    font-size: 14px;
+    border: 1px solid #ddd;
+    color: #444;
+    margin-left: 10px;
+}
+
+.mp-sort-btn.active {
+    background: #0073aa;
+    color: white;
+    border-color: #0073aa;
+}
+
+/* trend lines */
+.mp-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.mp-trend-line svg {
+    display: block;
+    opacity: 0.7;
+    filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.1));
+}
+
+/* Make it "glow" when on the trending tab */
+.mp-sort-btn.active[href*="trending"] + .mp-hub-grid .mp-trend-line svg {
+    opacity: 1;
+}
+
+
+
+
+
+
+/* facet sidebar */
+
+/* Layout Container */
+/* Layout Container */
+.mp-hub-layout {
+    display: grid;
+    grid-template-columns: 240px 1fr; /* Sidebar width: 240px */
+    gap: 40px;
+    margin-top: 30px;
+}
+
+/* Sidebar Styling */
+.mp-hub-sidebar {
+    border-right: 1px solid #eee;
+    padding-right: 20px;
+}
+
+.mp-facet-group {
+    margin-bottom: 30px;
+}
+
+.mp-facet-group h4 {
+    text-transform: uppercase;
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: #888;
+    margin-bottom: 15px;
+}
+
+.mp-facet-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mp-facet-link {
+    text-decoration: none;
+    color: #333;
+    font-size: 14px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.mp-facet-link:hover,
+.mp-facet-link.active {
+    background: #f0f7ff;
+    color: #0073aa;
+}
+
+.mp-facet-link .mp-count {
+    color: #aaa;
+    font-size: 12px;
+}
+
+/* Tag Cloud Facets */
+.mp-facet-tag {
+    display: inline-block;
+    text-decoration: none;
+    font-size: 12px;
+    color: #666;
+    background: #f5f5f5;
+    padding: 4px 8px;
+    border-radius: 12px;
+    margin: 2px;
+}
+
+.mp-facet-tag.active {
+    background: #0073aa;
+    color: #fff;
+}
+
+/* Responsive Fix */
+@media (max-width: 768px) {
+    .mp-hub-layout {
+        grid-template-columns: 1fr; /* Stacks sidebar on top of grid on mobile */
+    }
+    .mp-hub-sidebar {
+        border-right: none;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 20px;
+    }
+}
+
+/*******************/
+/* Sidebar Link Base */
+.mp-facet-link {
+    display: flex;
+    justify-content: space-between; /* Pushes number to the right */
+    align-items: center;
+    text-decoration: none;
+    color: #444;
+    font-size: 14px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.mp-facet-link:hover {
+    background-color: #f8f9fa;
+    color: #0073aa;
+}
+
+/* The Bubble Count */
+.mp-count {
+    background-color: #e1ecf4; /* Light blue background */
+    color: #39739d;            /* Darker blue text */
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;       /* Makes it round/pill shaped */
+    min-width: 24px;
+    text-align: center;
+    line-height: 1.4;
+}
+
+/* Active State Colors */
+.mp-facet-link.active {
+    background-color: #0073aa;
+    color: #ffffff !important;
+}
+
+.mp-facet-link.active .mp-count {
+    background-color: rgba(255, 255, 255, 0.2); /* Semi-transparent white bubble */
+    color: #ffffff;
+}
+
+/* Sidebar Tag specific style (optional) */
+.mp-tag-name {
+    opacity: 0.8;
+}

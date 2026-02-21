@@ -4,6 +4,9 @@ if (!defined("ABSPATH")) {
   exit();
 }
 
+// we have an api key for when we need it
+// $api_key = get_option('mp_openai_api_key');
+
 class MP_REST_Handler
 {
   /**
@@ -70,6 +73,11 @@ class MP_REST_Handler
         ? array_map("sanitize_text_field", $params["related_suggestions"])
         : [];
 
+    $breakdown =
+      isset($params["breakdown"]) && is_array($params["breakdown"])
+        ? $params["breakdown"]
+        : ["not found"];
+
     // Check for valid sources before proceeding
     $total_sources = 0;
     foreach ($transcript as $item) {
@@ -92,6 +100,7 @@ class MP_REST_Handler
     if ($existing_id) {
       update_post_meta($existing_id, "_raw_transcript", $transcript);
       update_post_meta($existing_id, "_related_suggestions", $related);
+      update_post_meta($existing_id, "_breakdown", $breakdown);
 
       // Attempt to set a featured image if missing
       $this->process_featured_image($existing_id, $transcript);
@@ -116,6 +125,7 @@ class MP_REST_Handler
     update_post_meta($post_id, "_gist_thread_id", $thread_id);
     update_post_meta($post_id, "_raw_transcript", $transcript);
     update_post_meta($post_id, "_related_suggestions", $related);
+    update_post_meta($post_id, "_breakdown", $breakdown);
 
     // Attempt to set a featured image
     $this->process_featured_image($post_id, $transcript);
