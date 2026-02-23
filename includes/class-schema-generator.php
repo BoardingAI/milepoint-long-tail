@@ -27,6 +27,16 @@ class MP_Schema_Generator
     }
 
     /**
+     * Cleans comments, strips tags, and decodes entities for schema text.
+     */
+    private function to_plain_text($string)
+    {
+        $clean = $this->clean_lit_comments($string);
+        $stripped = wp_strip_all_tags($clean);
+        return html_entity_decode($stripped, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    }
+
+    /**
      * Injects DiscussionForumPosting schema into the head of singular QA posts.
      */
     public function inject_schema()
@@ -41,15 +51,19 @@ class MP_Schema_Generator
         }
 
         // --- Data Extraction ---
-        $headline = get_the_title();
+        $headline = html_entity_decode(get_the_title(), ENT_QUOTES | ENT_HTML5, 'UTF-8');
         $datePublished = get_the_date('c'); // ISO 8601
         $dateModified = get_the_modified_date('c'); // ISO 8601
         $url = get_permalink();
+
         $description = get_the_excerpt();
+        if (!empty($description)) {
+             $description = html_entity_decode(wp_strip_all_tags($description), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        }
 
         // Fallback description if excerpt is empty
         if (empty($description) && !empty($transcript[0]['answer'])) {
-            $description = wp_trim_words($this->clean_lit_comments($transcript[0]['answer']), 20);
+            $description = wp_trim_words($this->to_plain_text($transcript[0]['answer']), 20);
         }
 
         $authorName = "Guest";
@@ -72,7 +86,9 @@ class MP_Schema_Generator
 
         // --- Main Entity: First Question ---
         $firstItem = $transcript[0];
-        $mainQuestionText = $this->clean_lit_comments($firstItem['question']);
+        $mainQuestionText = !empty($firstItem['question'])
+            ? $this->to_plain_text($firstItem['question'])
+            : '';
 
         // --- Comments: Answers and Subsequent Questions ---
         $comments = [];
@@ -81,7 +97,7 @@ class MP_Schema_Generator
         if (!empty($firstItem['answer'])) {
             $comments[] = [
                 '@type' => 'Comment',
-                'text' => $this->clean_lit_comments($firstItem['answer']),
+                'text' => $this->to_plain_text($firstItem['answer']),
                 'author' => [
                     '@type' => 'Person',
                     'name' => 'AI Assistant'
@@ -98,7 +114,7 @@ class MP_Schema_Generator
             if (!empty($item['question'])) {
                 $comments[] = [
                     '@type' => 'Comment',
-                    'text' => $this->clean_lit_comments($item['question']),
+                    'text' => $this->to_plain_text($item['question']),
                     'author' => [
                         '@type' => 'Person',
                         'name' => 'Guest'
@@ -110,7 +126,7 @@ class MP_Schema_Generator
             if (!empty($item['answer'])) {
                 $comments[] = [
                     '@type' => 'Comment',
-                    'text' => $this->clean_lit_comments($item['answer']),
+                    'text' => $this->to_plain_text($item['answer']),
                     'author' => [
                         '@type' => 'Person',
                         'name' => 'AI Assistant'
@@ -165,6 +181,6 @@ class MP_Schema_Generator
         }
 
         // Output Schema
-        echo '<script type="application/ld+json">' . json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>' . "\n";
+        echo '<script type="application/ld+json">' . json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) . '</script>' . "\n";
     }
 }
