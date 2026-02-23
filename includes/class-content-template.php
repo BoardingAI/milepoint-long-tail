@@ -280,12 +280,30 @@ class MP_Content_Template
 
       foreach ($related as $q) {
         $clean_q = $this->clean_lit_comments($q);
+
+        // Check for existing post
+        $query = new WP_Query([
+          'post_type' => 'milepoint_qa',
+          'title' => $clean_q,
+          'post_status' => 'publish',
+          'posts_per_page' => 1,
+          'fields' => 'ids',
+        ]);
+
+        if (!empty($query->posts)) {
+          $url = get_permalink($query->posts[0]);
+        } else {
+          $url = home_url('/chat/?q=' . urlencode($clean_q));
+        }
+
         $html .=
-          '<div style="color: #0073aa; font-size: 1.1rem; padding: 16px 20px; background: #fff; border: 1px solid #f0f0f0; border-radius: 8px;">';
+          '<a href="' .
+          esc_url($url) .
+          '" style="display: block; text-decoration: none; color: #0073aa; font-size: 1.1rem; padding: 16px 20px; background: #fff; border: 1px solid #f0f0f0; border-radius: 8px; transition: background-color 0.2s ease;">';
         $html .=
           '  <span style="margin-right: 12px; color: #0073aa; opacity: 0.4; font-weight: bold;">→</span> ' .
           esc_html($clean_q);
-        $html .= "</div>";
+        $html .= "</a>";
       }
 
       $html .= "  </div>";
