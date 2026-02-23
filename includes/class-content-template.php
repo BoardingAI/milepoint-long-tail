@@ -151,7 +151,7 @@ class MP_Content_Template
 
         foreach ($breakdown_data as $bd_index => $bd_item) {
           $color = $colors[$bd_index % count($colors)];
-          $width = $bd_item["percentage"] . "%";
+          $width = (float) $bd_item["percentage"] . "%";
           $isFirst = $bd_index === 0;
           $isLast = $bd_index === $total_items - 1;
 
@@ -191,7 +191,7 @@ class MP_Content_Template
             '<strong style="color: ' .
             $color .
             '; font-weight: 700;">' .
-            $bd_item["percentage"] .
+            esc_html($bd_item["percentage"]) .
             "%</strong> ";
           $html .=
             '<span style="color: #777;">' .
