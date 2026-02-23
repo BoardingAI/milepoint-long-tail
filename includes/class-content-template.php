@@ -24,13 +24,13 @@ class MP_Content_Template
         "mp-qa-style",
         plugins_url("../assets/css/mp-qa.css", __FILE__),
         [],
-        "1.0.5", // try to bump these every time
+        "1.0.6", // try to bump these every time
       );
       wp_enqueue_script(
         "mp-qa-hover",
         plugins_url("../assets/js/mp-qa-hover.js", __FILE__),
         [],
-        "1.0.5",
+        "1.0.6",
         true, // Load in footer
       );
     }
@@ -280,12 +280,16 @@ class MP_Content_Template
 
       foreach ($related as $q) {
         $clean_q = $this->clean_lit_comments($q);
+        $url = home_url('/chat/?q=' . urlencode($clean_q));
+
         $html .=
-          '<div style="color: #0073aa; font-size: 1.1rem; padding: 16px 20px; background: #fff; border: 1px solid #f0f0f0; border-radius: 8px;">';
+          '<a href="' .
+          esc_url($url) .
+          '" style="display: block; text-decoration: none; color: #0073aa; font-size: 1.1rem; padding: 16px 20px; background: #fff; border: 1px solid #f0f0f0; border-radius: 8px; transition: background-color 0.2s ease;">';
         $html .=
           '  <span style="margin-right: 12px; color: #0073aa; opacity: 0.4; font-weight: bold;">→</span> ' .
           esc_html($clean_q);
-        $html .= "</div>";
+        $html .= "</a>";
       }
 
       $html .= "  </div>";
