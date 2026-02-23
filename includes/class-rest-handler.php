@@ -106,15 +106,14 @@ class MP_REST_Handler
       // Rolling hold strategy: If post is scheduled ('future'), reset the 24h timer
       $status = get_post_status($existing_id);
       if ($status === "future") {
-        $current_ts = current_time("timestamp");
-        $current_ts_gmt = current_time("timestamp", true);
-        $future_ts = $current_ts + DAY_IN_SECONDS;
-        $future_ts_gmt = $current_ts_gmt + DAY_IN_SECONDS;
+        $future_ts_gmt = current_time("timestamp", true) + DAY_IN_SECONDS;
+        $post_date_gmt = gmdate("Y-m-d H:i:s", $future_ts_gmt);
+        $post_date = get_date_from_gmt($post_date_gmt);
 
         wp_update_post([
           "ID" => $existing_id,
-          "post_date" => date("Y-m-d H:i:s", $future_ts),
-          "post_date_gmt" => gmdate("Y-m-d H:i:s", $future_ts_gmt),
+          "post_date" => $post_date,
+          "post_date_gmt" => $post_date_gmt,
         ]);
       }
 
@@ -136,18 +135,17 @@ class MP_REST_Handler
       $transcript[0]["question"] ?? "New Q&A",
     );
 
-    $current_ts = current_time("timestamp");
-    $current_ts_gmt = current_time("timestamp", true);
-    $future_ts = $current_ts + DAY_IN_SECONDS;
-    $future_ts_gmt = $current_ts_gmt + DAY_IN_SECONDS;
+    $future_ts_gmt = current_time("timestamp", true) + DAY_IN_SECONDS;
+    $post_date_gmt = gmdate("Y-m-d H:i:s", $future_ts_gmt);
+    $post_date = get_date_from_gmt($post_date_gmt);
 
     $post_id = wp_insert_post([
       "post_title" => $first_question,
       "post_content" => "<!-- MILEPOINT_LONG_TAIL -->",
       "post_status" => "future",
       "post_type" => "milepoint_qa",
-      "post_date" => date("Y-m-d H:i:s", $future_ts),
-      "post_date_gmt" => gmdate("Y-m-d H:i:s", $future_ts_gmt),
+      "post_date" => $post_date,
+      "post_date_gmt" => $post_date_gmt,
     ]);
 
     update_post_meta($post_id, "_gist_thread_id", $thread_id);
