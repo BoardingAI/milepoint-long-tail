@@ -24,8 +24,13 @@ class MP_REST_Handler
   /**
    * Only allow users who can edit posts
    */
-  public function check_permissions()
+  public function check_permissions($request)
   {
+    $nonce = $request->get_header("x-milepoint-nonce");
+    if (wp_verify_nonce($nonce, "milepoint_public_chat")) {
+      return true;
+    }
+
     return current_user_can("edit_posts");
   }
 

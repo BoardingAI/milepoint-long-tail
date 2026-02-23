@@ -174,6 +174,7 @@ function getDeepFlattenedClone(node) {
           headers: {
             "Content-Type": "application/json",
             "X-WP-Nonce": mpData.nonce,
+            "X-MilePoint-Nonce": mpData.milepoint_nonce,
           },
           body: JSON.stringify(payload),
         });
