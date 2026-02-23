@@ -3,7 +3,7 @@
 /*
 Plugin Name: MilePoint Long-Tail DEV
 Description: Captures Gist AI chats and transforms them into SEO posts.
-Version: 1.0.6
+Version: 1.0.7
 Author: pguardiario@gmail.com
 */
 
@@ -65,6 +65,7 @@ add_action("wp_enqueue_scripts", function () {
     wp_localize_script("mp-longtail-bridge", "mpData", [
       "rest_url" => esc_url_raw(rest_url("milepoint-v1/generate-post")),
       "nonce" => wp_create_nonce("wp_rest"),
+      "milepoint_nonce" => wp_create_nonce("milepoint_public_chat"),
     ]);
 
     wp_enqueue_script(
