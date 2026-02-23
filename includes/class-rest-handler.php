@@ -103,6 +103,25 @@ class MP_REST_Handler
     $existing_id = $this->get_post_id_by_thread($thread_id);
 
     if ($existing_id) {
+      // Rolling hold strategy: If post is scheduled ('future'), reset the 24h timer
+      $status = get_post_status($existing_id);
+      if ($status === "future") {
+        $current_time = current_time("mysql");
+        $current_time_gmt = current_time("mysql", 1);
+
+        wp_update_post([
+          "ID" => $existing_id,
+          "post_date" => date(
+            "Y-m-d H:i:s",
+            strtotime("+24 hours", strtotime($current_time)),
+          ),
+          "post_date_gmt" => date(
+            "Y-m-d H:i:s",
+            strtotime("+24 hours", strtotime($current_time_gmt)),
+          ),
+        ]);
+      }
+
       update_post_meta($existing_id, "_raw_transcript", $transcript);
       update_post_meta($existing_id, "_related_suggestions", $related);
       update_post_meta($existing_id, "_breakdown", $breakdown);
@@ -120,11 +139,23 @@ class MP_REST_Handler
     $first_question = wp_strip_all_tags(
       $transcript[0]["question"] ?? "New Q&A",
     );
+
+    $current_time = current_time("mysql");
+    $current_time_gmt = current_time("mysql", 1);
+
     $post_id = wp_insert_post([
       "post_title" => $first_question,
       "post_content" => "<!-- MILEPOINT_LONG_TAIL -->",
-      "post_status" => "draft",
+      "post_status" => "future",
       "post_type" => "milepoint_qa",
+      "post_date" => date(
+        "Y-m-d H:i:s",
+        strtotime("+24 hours", strtotime($current_time)),
+      ),
+      "post_date_gmt" => date(
+        "Y-m-d H:i:s",
+        strtotime("+24 hours", strtotime($current_time_gmt)),
+      ),
     ]);
 
     update_post_meta($post_id, "_gist_thread_id", $thread_id);
