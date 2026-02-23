@@ -159,7 +159,7 @@ class MP_REST_Handler
     $this->process_featured_image($post_id, $transcript);
 
     return new WP_REST_Response(
-      ["message" => "New draft created. ID: " . $post_id],
+      ["message" => "New scheduled post created. ID: " . $post_id],
       200,
     );
   }
