@@ -24,13 +24,13 @@ class MP_Content_Template
         "mp-qa-style",
         plugins_url("../assets/css/mp-qa.css", __FILE__),
         [],
-        "1.0.5", // try to bump these every time
+        "1.0.6", // try to bump these every time
       );
       wp_enqueue_script(
         "mp-qa-hover",
         plugins_url("../assets/js/mp-qa-hover.js", __FILE__),
         [],
-        "1.0.5",
+        "1.0.6",
         true, // Load in footer
       );
     }
@@ -280,21 +280,7 @@ class MP_Content_Template
 
       foreach ($related as $q) {
         $clean_q = $this->clean_lit_comments($q);
-
-        // Check for existing post
-        $query = new WP_Query([
-          'post_type' => 'milepoint_qa',
-          'title' => $clean_q,
-          'post_status' => 'publish',
-          'posts_per_page' => 1,
-          'fields' => 'ids',
-        ]);
-
-        if (!empty($query->posts)) {
-          $url = get_permalink($query->posts[0]);
-        } else {
-          $url = home_url('/chat/?q=' . urlencode($clean_q));
-        }
+        $url = home_url('/chat/?q=' . urlencode($clean_q));
 
         $html .=
           '<a href="' .
