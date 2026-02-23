@@ -149,11 +149,11 @@ class MP_Content_Template
         $colors = ["#00457c", "#0073aa", "#22a1c4", "#a5a5a5"];
         $total_items = count($breakdown_data);
 
-        foreach ($breakdown_data as $index => $item) {
-          $color = $colors[$index % count($colors)];
-          $width = $item["percentage"] . "%";
-          $isFirst = $index === 0;
-          $isLast = $index === $total_items - 1;
+        foreach ($breakdown_data as $bd_index => $bd_item) {
+          $color = $colors[$bd_index % count($colors)];
+          $width = $bd_item["percentage"] . "%";
+          $isFirst = $bd_index === 0;
+          $isLast = $bd_index === $total_items - 1;
 
           // Each segment is a vertical flexbox (Bar on top, Label on bottom)
           // margin-right creates the white gap between segments
@@ -191,11 +191,11 @@ class MP_Content_Template
             '<strong style="color: ' .
             $color .
             '; font-weight: 700;">' .
-            $item["percentage"] .
+            $bd_item["percentage"] .
             "%</strong> ";
           $html .=
             '<span style="color: #777;">' .
-            htmlspecialchars($item["source"]) .
+            htmlspecialchars($bd_item["source"]) .
             "</span>";
           $html .= "</div>";
 
