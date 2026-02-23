@@ -192,3 +192,49 @@ function getDeepFlattenedClone(node) {
   console.log("MilePoint Bridge: Polling started (1s)");
   setInterval(runPoll, pollInterval);
 })();
+
+/**
+ * FEATURE: Pre-fill Chat Input from URL Param
+ */
+(function () {
+  const urlParams = new URLSearchParams(window.location.search);
+  const question = urlParams.get("q");
+
+  if (!question) return;
+
+  console.log("MilePoint Bridge: Found question param:", question);
+
+  // Poll for the prompt element
+  const maxAttempts = 30; // 30 seconds approx
+  let attempts = 0;
+
+  const pollForPrompt = setInterval(() => {
+    attempts++;
+    if (attempts > maxAttempts) {
+      clearInterval(pollForPrompt);
+      console.log("MilePoint Bridge: Timed out waiting for chat prompt.");
+      return;
+    }
+
+    const promptHost = document.getElementById("prompt-host");
+    if (!promptHost) return;
+
+    const promptComponent = promptHost.querySelector("gist-chat-prompt");
+    if (!promptComponent || !promptComponent.shadowRoot) return;
+
+    const textarea = promptComponent.shadowRoot.querySelector("textarea");
+
+    if (textarea) {
+      clearInterval(pollForPrompt);
+      console.log("MilePoint Bridge: Chat prompt found. Injecting question.");
+
+      // Inject and trigger events
+      textarea.value = question;
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+      textarea.dispatchEvent(new Event("change", { bubbles: true }));
+
+      // Optional: Focus
+      textarea.focus();
+    }
+  }, 1000);
+})();

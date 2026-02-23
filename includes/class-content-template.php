@@ -280,12 +280,25 @@ class MP_Content_Template
 
       foreach ($related as $q) {
         $clean_q = $this->clean_lit_comments($q);
+
+        // 1. Check if post exists
+        $existing_post = get_page_by_title($clean_q, OBJECT, 'milepoint_qa');
+
+        if ($existing_post && $existing_post->post_status === 'publish') {
+            $link_url = get_permalink($existing_post->ID);
+        } else {
+            // 2. Fallback to Chat URL with query param
+            // Assuming /chat/ is the slug. We can also use site_url('/chat/')
+            $link_url = site_url('/chat/') . '?q=' . urlencode($clean_q);
+        }
+
+        // We change the outer div to an anchor tag, keeping the same styles + display:block + text-decoration:none
         $html .=
-          '<div style="color: #0073aa; font-size: 1.1rem; padding: 16px 20px; background: #fff; border: 1px solid #f0f0f0; border-radius: 8px;">';
+          '<a href="' . esc_url($link_url) . '" style="text-decoration: none; display: block; color: #0073aa; font-size: 1.1rem; padding: 16px 20px; background: #fff; border: 1px solid #f0f0f0; border-radius: 8px; transition: all 0.2s ease;">';
         $html .=
           '  <span style="margin-right: 12px; color: #0073aa; opacity: 0.4; font-weight: bold;">→</span> ' .
           esc_html($clean_q);
-        $html .= "</div>";
+        $html .= "</a>";
       }
 
       $html .= "  </div>";
