@@ -98,6 +98,8 @@ class MP_Schema_Generator
             $comments[] = [
                 '@type' => 'Comment',
                 'text' => $this->to_plain_text($firstItem['answer']),
+                'datePublished' => $datePublished,
+                'url' => $url . '#mp-a-0',
                 'author' => [
                     '@type' => 'Person',
                     'name' => 'AI Assistant'
@@ -115,6 +117,8 @@ class MP_Schema_Generator
                 $comments[] = [
                     '@type' => 'Comment',
                     'text' => $this->to_plain_text($item['question']),
+                    'datePublished' => $datePublished,
+                    'url' => $url . '#mp-q-' . $i,
                     'author' => [
                         '@type' => 'Person',
                         'name' => 'Guest'
@@ -127,6 +131,8 @@ class MP_Schema_Generator
                 $comments[] = [
                     '@type' => 'Comment',
                     'text' => $this->to_plain_text($item['answer']),
+                    'datePublished' => $datePublished,
+                    'url' => $url . '#mp-a-' . $i,
                     'author' => [
                         '@type' => 'Person',
                         'name' => 'AI Assistant'
