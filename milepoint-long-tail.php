@@ -3,7 +3,7 @@
 /*
 Plugin Name: MilePoint Long-Tail DEV
 Description: Captures Gist AI chats and transforms them into SEO posts.
-Version: 1.0.7
+Version: 1.0.8
 Author: pguardiario@gmail.com
 */
 
@@ -17,6 +17,7 @@ require_once plugin_dir_path(__FILE__) . "includes/class-rest-handler.php";
 require_once plugin_dir_path(__FILE__) . "includes/class-content-template.php";
 require_once plugin_dir_path(__FILE__) . "includes/class-ai-handler.php";
 require_once plugin_dir_path(__FILE__) . "includes/class-qa-cpt.php";
+require_once plugin_dir_path(__FILE__) . "includes/class-schema-generator.php";
 
 // Hooks that need to work for both Admin and REST API (like publishing hooks)
 new MP_AI_Handler();
@@ -42,6 +43,9 @@ function mp_lt_activate_plugin()
 
 // Initialize display template
 new MP_Content_Template();
+
+// Initialize schema generator
+new MP_Schema_Generator();
 
 // Initialize the REST API
 add_action("rest_api_init", function () {
