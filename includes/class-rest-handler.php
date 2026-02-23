@@ -106,19 +106,15 @@ class MP_REST_Handler
       // Rolling hold strategy: If post is scheduled ('future'), reset the 24h timer
       $status = get_post_status($existing_id);
       if ($status === "future") {
-        $current_time = current_time("mysql");
-        $current_time_gmt = current_time("mysql", 1);
+        $current_ts = current_time("timestamp");
+        $current_ts_gmt = current_time("timestamp", true);
+        $future_ts = $current_ts + DAY_IN_SECONDS;
+        $future_ts_gmt = $current_ts_gmt + DAY_IN_SECONDS;
 
         wp_update_post([
           "ID" => $existing_id,
-          "post_date" => date(
-            "Y-m-d H:i:s",
-            strtotime("+24 hours", strtotime($current_time)),
-          ),
-          "post_date_gmt" => date(
-            "Y-m-d H:i:s",
-            strtotime("+24 hours", strtotime($current_time_gmt)),
-          ),
+          "post_date" => date("Y-m-d H:i:s", $future_ts),
+          "post_date_gmt" => gmdate("Y-m-d H:i:s", $future_ts_gmt),
         ]);
       }
 
@@ -140,22 +136,18 @@ class MP_REST_Handler
       $transcript[0]["question"] ?? "New Q&A",
     );
 
-    $current_time = current_time("mysql");
-    $current_time_gmt = current_time("mysql", 1);
+    $current_ts = current_time("timestamp");
+    $current_ts_gmt = current_time("timestamp", true);
+    $future_ts = $current_ts + DAY_IN_SECONDS;
+    $future_ts_gmt = $current_ts_gmt + DAY_IN_SECONDS;
 
     $post_id = wp_insert_post([
       "post_title" => $first_question,
       "post_content" => "<!-- MILEPOINT_LONG_TAIL -->",
       "post_status" => "future",
       "post_type" => "milepoint_qa",
-      "post_date" => date(
-        "Y-m-d H:i:s",
-        strtotime("+24 hours", strtotime($current_time)),
-      ),
-      "post_date_gmt" => date(
-        "Y-m-d H:i:s",
-        strtotime("+24 hours", strtotime($current_time_gmt)),
-      ),
+      "post_date" => date("Y-m-d H:i:s", $future_ts),
+      "post_date_gmt" => gmdate("Y-m-d H:i:s", $future_ts_gmt),
     ]);
 
     update_post_meta($post_id, "_gist_thread_id", $thread_id);
