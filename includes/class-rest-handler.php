@@ -156,6 +156,14 @@ class MP_REST_Handler
       "post_date_gmt" => $post_date_gmt,
     ]);
 
+    if (is_wp_error($post_id) || empty($post_id)) {
+      error_log("MilePoint: Failed to create scheduled post for thread " . $thread_id);
+      return new WP_REST_Response(
+        ["message" => "Failed to create scheduled post."],
+        500,
+      );
+    }
+
     update_post_meta($post_id, "_gist_thread_id", $thread_id);
     update_post_meta($post_id, "_raw_transcript", $transcript);
     update_post_meta($post_id, "_related_suggestions", $related);
