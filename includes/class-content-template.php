@@ -113,7 +113,7 @@ class MP_Content_Template
     $html = '<div id="mp-hover-card"></div>';
 
     $html .=
-      '<div class="mp-qa-container" style="max-width: 800px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;">';
+      '<div class="mp-qa-container" style="margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;">';
     // let's add the content as a json object so we can inspect it later
     $html .=
       '<script type="application/json" id="mp-qa-content">' .
@@ -130,12 +130,13 @@ class MP_Content_Template
       $html .= '<div class="mp-qa-row" style="margin-bottom: 60px;">';
 
       // MAIN HEADER: The Question
-      if (is_singular('milepoint_qa')) {
+      // Skip the first H2 because it duplicates the main H1 title
+      if (is_singular('milepoint_qa') && $index > 0) {
         // ID for anchor linking (schema)
         $q_id = 'mp-q-' . $index;
 
         $html .=
-          '  <h2 id="' . esc_attr($q_id) . '" class="mp-q" style="color: #00457c; font-size: 2.1rem; font-weight: 800; margin: 0 0 20px 0; line-height: 1.2; letter-spacing: -0.03em;">' .
+          '  <h2 id="' . esc_attr($q_id) . '" class="mp-q" style="color: #00457c; font-size: 2.1rem; font-weight: 800; margin: 0 0 20px 0; line-height: 1.2;">' .
          $question .
           "</h2>";
       }
