@@ -110,11 +110,19 @@ class MP_REST_Handler
         $post_date_gmt = gmdate("Y-m-d H:i:s", $future_ts_gmt);
         $post_date = get_date_from_gmt($post_date_gmt);
 
-        wp_update_post([
+        $update_result = wp_update_post([
           "ID" => $existing_id,
           "post_date" => $post_date,
           "post_date_gmt" => $post_date_gmt,
         ]);
+
+        if ($update_result === 0) {
+          error_log("MilePoint: Failed to reschedule post " . $existing_id);
+          return new WP_REST_Response(
+            ["message" => "Failed to reschedule post."],
+            500,
+          );
+        }
       }
 
       update_post_meta($existing_id, "_raw_transcript", $transcript);
