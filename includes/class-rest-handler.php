@@ -103,6 +103,28 @@ class MP_REST_Handler
     $existing_id = $this->get_post_id_by_thread($thread_id);
 
     if ($existing_id) {
+      // Rolling hold strategy: If post is scheduled ('future'), reset the 24h timer
+      $status = get_post_status($existing_id);
+      if ($status === "future") {
+        $future_ts_gmt = current_time("timestamp", true) + DAY_IN_SECONDS;
+        $post_date_gmt = gmdate("Y-m-d H:i:s", $future_ts_gmt);
+        $post_date = get_date_from_gmt($post_date_gmt);
+
+        $update_result = wp_update_post([
+          "ID" => $existing_id,
+          "post_date" => $post_date,
+          "post_date_gmt" => $post_date_gmt,
+        ]);
+
+        if ($update_result === 0) {
+          error_log("MilePoint: Failed to reschedule post " . $existing_id);
+          return new WP_REST_Response(
+            ["message" => "Failed to reschedule post."],
+            500,
+          );
+        }
+      }
+
       update_post_meta($existing_id, "_raw_transcript", $transcript);
       update_post_meta($existing_id, "_related_suggestions", $related);
       update_post_meta($existing_id, "_breakdown", $breakdown);
@@ -120,12 +142,27 @@ class MP_REST_Handler
     $first_question = wp_strip_all_tags(
       $transcript[0]["question"] ?? "New Q&A",
     );
+
+    $future_ts_gmt = current_time("timestamp", true) + DAY_IN_SECONDS;
+    $post_date_gmt = gmdate("Y-m-d H:i:s", $future_ts_gmt);
+    $post_date = get_date_from_gmt($post_date_gmt);
+
     $post_id = wp_insert_post([
       "post_title" => $first_question,
       "post_content" => "<!-- MILEPOINT_LONG_TAIL -->",
-      "post_status" => "draft",
+      "post_status" => "future",
       "post_type" => "milepoint_qa",
+      "post_date" => $post_date,
+      "post_date_gmt" => $post_date_gmt,
     ]);
+
+    if (is_wp_error($post_id) || empty($post_id)) {
+      error_log("MilePoint: Failed to create scheduled post for thread " . $thread_id);
+      return new WP_REST_Response(
+        ["message" => "Failed to create scheduled post."],
+        500,
+      );
+    }
 
     update_post_meta($post_id, "_gist_thread_id", $thread_id);
     update_post_meta($post_id, "_raw_transcript", $transcript);
@@ -136,7 +173,7 @@ class MP_REST_Handler
     $this->process_featured_image($post_id, $transcript);
 
     return new WP_REST_Response(
-      ["message" => "New draft created. ID: " . $post_id],
+      ["message" => "New scheduled post created. ID: " . $post_id],
       200,
     );
   }
