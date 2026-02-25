@@ -2,7 +2,8 @@ single-milepoint_qa .entry-title {
   display: none !important;
 }
 .mp-qa-container {
-  margin-top: 50px;
+  margin: 0 auto;
+  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;
 }
 .mp-a h1,
 .mp-a h2,
@@ -15,6 +16,103 @@ single-milepoint_qa .entry-title {
 }
 .mp-qa-row:first-child .mp-q {
   margin-top: 0;
+}
+
+.mp-qa-row {
+  margin-bottom: 60px;
+}
+.mp-q {
+  color: #2B62B5;
+  font-size: 2.1rem;
+  font-weight: 800;
+  margin: 0 0 20px 0;
+  line-height: 1.2;
+}
+.mp-attribution-wrapper {
+  margin: 20px 0 30px 0;
+  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  display: flex;
+  width: 100%;
+}
+.mp-attribution-segment {
+  display: flex;
+  flex-direction: column;
+}
+.mp-attribution-bar {
+  height: 10px;
+  margin-bottom: 8px;
+}
+.mp-attribution-bar-first {
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+}
+.mp-attribution-bar-last {
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+}
+.mp-attribution-label {
+  font-size: 0.85rem;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 5px;
+}
+.mp-attribution-pct {
+  font-weight: 700;
+}
+.mp-attribution-source {
+  color: #777;
+}
+.mp-a {
+  border-left: 4px solid #2B62B5;
+  padding: 0 0 0 30px;
+  margin-left: 2px;
+  color: #444;
+  line-height: 1.8;
+  font-size: 1.15rem;
+}
+.mp-related-box {
+  margin-top: 80px;
+  padding: 35px;
+  background: #fdfdfd;
+  border: 1px solid #eee;
+  border-radius: 12px;
+}
+.mp-related-title {
+  margin: 0 0 25px 0;
+  font-size: 0.95rem;
+  color: #888;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+}
+.mp-related-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.mp-related-link {
+  display: block;
+  text-decoration: none;
+  color: #2B62B5;
+  font-size: 1.1rem;
+  padding: 16px 20px;
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
+}
+.mp-related-arrow {
+  margin-right: 12px;
+  color: #2B62B5;
+  opacity: 0.4;
+  font-weight: bold;
+}
+.mp-hover-card-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
 }
 
 /* Sources Carousel */
@@ -240,4 +338,3 @@ single-milepoint_qa .entry-title {
 .mp-api-key-container .dashicons {
   margin-top: 4px;
 }
-
