@@ -17,6 +17,7 @@ require_once plugin_dir_path(__FILE__) . "includes/class-rest-handler.php";
 require_once plugin_dir_path(__FILE__) . "includes/class-content-template.php";
 require_once plugin_dir_path(__FILE__) . "includes/class-ai-handler.php";
 require_once plugin_dir_path(__FILE__) . "includes/class-qa-cpt.php";
+require_once plugin_dir_path(__FILE__) . "includes/class-conversation-cpt.php";
 
 // Hooks that need to work for both Admin and REST API (like publishing hooks)
 new MP_AI_Handler();
