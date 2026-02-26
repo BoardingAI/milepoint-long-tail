@@ -5,10 +5,6 @@
   --gist-font-family-base: var(--global-body-font-family, sans-serif);
 }
 
-.single-milepoint_qa .entry-title {
-  display: none !important;
-}
-
 /* Main Container */
 .mp-qa-container {
   margin: 0 auto;
