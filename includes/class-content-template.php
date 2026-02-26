@@ -137,7 +137,7 @@ class MP_Content_Template
 
         $html .=
           '  <h2 id="' . esc_attr($q_id) . '" class="mp-q">' .
-         $question .
+         esc_html($question) .
           "</h2>";
       }
 
