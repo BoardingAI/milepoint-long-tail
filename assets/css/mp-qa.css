@@ -114,8 +114,8 @@
   background-color: var(--gist-color-brand-accent-3);
 }
 .mp-bar-color-3 {
-  background-color: var(--gist-color-brand-accent-1, #2B62B5); /* Fallback */
-  background-color: color-mix(in srgb, var(--gist-color-brand-accent-1, #000000) 40%, white);
+  background-color: #AAC0E1; /* Fallback (approx 40% accent mix) */
+  background-color: color-mix(in srgb, var(--gist-color-brand-accent-1, #2B62B5) 40%, white);
 }
 .mp-text-color-0 {
   color: var(--gist-color-brand-accent-1);
@@ -127,8 +127,8 @@
   color: var(--gist-color-brand-accent-3);
 }
 .mp-text-color-3 {
-  color: var(--gist-color-brand-accent-1, #2B62B5); /* Fallback */
-  color: color-mix(in srgb, var(--gist-color-brand-accent-1, #000000) 40%, white);
+  color: #AAC0E1; /* Fallback (approx 40% accent mix) */
+  color: color-mix(in srgb, var(--gist-color-brand-accent-1, #2B62B5) 40%, white);
 }
 
 
@@ -272,6 +272,7 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+/* Gist Chat Citation (External/Legacy Class) */
 .gist-chat-citation {
   position: relative;
   top: -2px;

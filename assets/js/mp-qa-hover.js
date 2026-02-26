@@ -51,17 +51,60 @@ document.addEventListener("DOMContentLoaded", function () {
     pill.addEventListener("mouseenter", function () {
       showCard();
 
-      // Build UI to match the carousel card structure
-      card.innerHTML = `
-                <a href="${sourceMatch.url}" class="mp-hover-link" target="_blank" rel="noopener noreferrer">
-                    <div class='mp-source-header'>
-                        <img src='${sourceMatch.favicon}' class='mp-source-icon' alt=''>
-                        <span class='mp-source-site-name'>${sourceMatch.source}</span>
-                    </div>
-                    <div class='mp-source-title'>${sourceMatch.title}</div>
-                    <div class='mp-source-excerpt'>${sourceMatch.excerpt || ""}</div>
-                </a>
-            `;
+      // Build UI to match the carousel card structure with DOM APIs (XSS protection)
+      card.innerHTML = ""; // Clear previous content
+
+      const link = document.createElement("a");
+      // Validate URL protocol
+      const safeUrl =
+        sourceMatch.url &&
+        (sourceMatch.url.startsWith("http://") ||
+          sourceMatch.url.startsWith("https://"))
+          ? sourceMatch.url
+          : "#";
+      link.href = safeUrl;
+      link.className = "mp-hover-link";
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+
+      // Header
+      const header = document.createElement("div");
+      header.className = "mp-source-header";
+
+      const icon = document.createElement("img");
+      // Basic favicon protocol validation
+      const safeFavicon =
+        sourceMatch.favicon &&
+        (sourceMatch.favicon.startsWith("http://") ||
+          sourceMatch.favicon.startsWith("https://"))
+          ? sourceMatch.favicon
+          : "";
+      icon.src = safeFavicon;
+      icon.className = "mp-source-icon";
+      icon.alt = "";
+
+      const siteName = document.createElement("span");
+      siteName.className = "mp-source-site-name";
+      siteName.textContent = sourceMatch.source;
+
+      header.appendChild(icon);
+      header.appendChild(siteName);
+
+      // Title
+      const title = document.createElement("div");
+      title.className = "mp-source-title";
+      title.textContent = sourceMatch.title;
+
+      // Excerpt
+      const excerpt = document.createElement("div");
+      excerpt.className = "mp-source-excerpt";
+      excerpt.textContent = sourceMatch.excerpt || "";
+
+      link.appendChild(header);
+      link.appendChild(title);
+      link.appendChild(excerpt);
+
+      card.appendChild(link);
 
       const rect = this.getBoundingClientRect();
       card.style.position = "fixed";
