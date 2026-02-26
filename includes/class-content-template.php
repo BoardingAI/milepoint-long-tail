@@ -136,7 +136,7 @@ class MP_Content_Template
 
         $html .=
           '  <h2 id="' . esc_attr($q_id) . '" class="mp-q">' .
-         $question .
+         esc_html($question) .
           "</h2>";
       }
 
@@ -144,8 +144,6 @@ class MP_Content_Template
       if (!empty($breakdown_data) && is_singular('milepoint_qa')) {
         // Main container for the whole bar system
         $html .= '<div class="mp-attribution-wrapper">';
-
-        $total_items = count($breakdown_data);
 
         foreach ($breakdown_data as $bd_index => $bd_item) {
           $color_index = $bd_index % 4; // Using modulus 4 to cycle through 4 color variants

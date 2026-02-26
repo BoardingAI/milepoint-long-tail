@@ -315,18 +315,6 @@ single-milepoint_qa .entry-title {
   height: 20px;
 }
 
-/* The pointer triangle */
-#mp-hover-card::after {
-  content: "";
-  position: absolute;
-  bottom: -8px;
-  left: 50%;
-  transform: translateX(-50%);
-  border-width: 8px 8px 0 8px;
-  border-style: solid;
-  border-color: white transparent transparent transparent;
-}
-
 /* Hover effects for the inner card (optional, matching carousel behavior) */
 #mp-hover-card:hover {
   border-color: #ccc;
