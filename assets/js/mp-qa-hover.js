@@ -53,7 +53,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       // Build UI to match the carousel card structure
       card.innerHTML = `
-                <a href="${sourceMatch.url}" target="_blank" rel="noopener noreferrer" style="text-decoration:none; color:inherit; display:block;">
+                <a href="${sourceMatch.url}" target="_blank" rel="noopener noreferrer" class="mp-hover-card-link">
                     <div class='mp-source-header'>
                         <img src='${sourceMatch.favicon}' class='mp-source-icon' alt=''>
                         <span class='mp-source-site-name'>${sourceMatch.source}</span>
