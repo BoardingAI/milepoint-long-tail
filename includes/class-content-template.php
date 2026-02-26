@@ -206,7 +206,7 @@ class MP_Content_Template
 
       $html .=
         '  <div id="' . esc_attr($a_id) . '" class="mp-a">';
-      $html .= $answer;
+      $html .= wp_kses_post($answer);
       $html .= "  </div>"; // Close Answer Box
 
       // Sources carousel
