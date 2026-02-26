@@ -147,12 +147,13 @@ class MP_Content_Template
         $html .=
           '<div class="mp-attribution-wrapper">';
 
-        // Brand colors: Accent 1, Accent 2, Accent 3, and a 40% mix of Accent 1 with white (#AAC0E1)
-        $colors = ["#2B62B5", "#4189C9", "#61E0FA", "#AAC0E1"];
+        // Color class map based on index
+        $color_classes = ["accent-1", "accent-2", "accent-3", "mixed"];
         $total_items = count($breakdown_data);
 
         foreach ($breakdown_data as $bd_index => $bd_item) {
-          $color = $colors[$bd_index % count($colors)];
+          $color_key = $color_classes[$bd_index % count($color_classes)];
+
           $width = (float) $bd_item["percentage"] . "%";
           $isFirst = $bd_index === 0;
           $isLast = $bd_index === $total_items - 1;
@@ -162,14 +163,14 @@ class MP_Content_Template
           $marginRight = $isLast ? "0" : "3px";
 
           $html .=
-            '<div class="mp-attribution-segment" style="width: ' .
+            '<div class="mp-attribution-segment" style="--mp-bar-width: ' .
             $width .
             "; margin-right: " .
             $marginRight .
             ';">';
 
           // 1. THE COLORED BAR PIECE
-          $barClasses = "mp-attribution-bar";
+          $barClasses = "mp-attribution-bar mp-fill-" . $color_key;
           if ($isFirst) {
             $barClasses .= " mp-attribution-bar-first";
           }
@@ -178,17 +179,13 @@ class MP_Content_Template
           }
 
           $html .=
-            '<div class="' . $barClasses . '" style="background-color: ' .
-            $color .
-            ';"></div>';
+            '<div class="' . $barClasses . '"></div>';
 
           // 2. THE LABEL (Now perfectly aligned to the start of the bar segment)
           $html .=
             '<div class="mp-attribution-label">';
           $html .=
-            '<strong class="mp-attribution-pct" style="color: ' .
-            $color .
-            ';">' .
+            '<strong class="mp-attribution-pct mp-text-' . $color_key . '">' .
             esc_html($bd_item["percentage"]) .
             "%</strong> ";
           $html .=
