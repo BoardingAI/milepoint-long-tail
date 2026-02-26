@@ -24,13 +24,13 @@ class MP_Content_Template
         "mp-qa-style",
         plugins_url("../assets/css/mp-qa.css", __FILE__),
         [],
-        "1.1.0", // try to bump these every time
+        "1.0.9", // try to bump these every time
       );
       wp_enqueue_script(
         "mp-qa-hover",
         plugins_url("../assets/js/mp-qa-hover.js", __FILE__),
         [],
-        "1.1.0",
+        "1.0.9",
         true, // Load in footer
       );
     }
@@ -113,7 +113,7 @@ class MP_Content_Template
     $html = '<div id="mp-hover-card"></div>';
 
     $html .=
-      '<div class="mp-qa-container">';
+      '<div class="mp-qa-container" style="margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;">';
     // let's add the content as a json object so we can inspect it later
     $html .=
       '<script type="application/json" id="mp-qa-content">' .
@@ -127,7 +127,7 @@ class MP_Content_Template
       $answer = $this->clean_lit_comments($item["answer"]);
       $sources = isset($item["sources"]) ? $item["sources"] : [];
 
-      $html .= '<div class="mp-qa-row">';
+      $html .= '<div class="mp-qa-row" style="margin-bottom: 60px;">';
 
       // MAIN HEADER: The Question
       // Skip the first H2 because it duplicates the main H1 title
@@ -136,8 +136,8 @@ class MP_Content_Template
         $q_id = 'mp-q-' . $index;
 
         $html .=
-          '  <h2 id="' . esc_attr($q_id) . '" class="mp-q">' .
-         esc_html($question) .
+          '  <h2 id="' . esc_attr($q_id) . '" class="mp-q" style="color: #2B62B5; font-size: 2.1rem; font-weight: 800; margin: 0 0 20px 0; line-height: 1.2;">' .
+         $question .
           "</h2>";
       }
 
@@ -145,15 +145,14 @@ class MP_Content_Template
       if (!empty($breakdown_data) && is_singular('milepoint_qa')) {
         // Main container for the whole bar system
         $html .=
-          '<div class="mp-attribution-wrapper">';
+          '<div class="mp-attribution-wrapper" style="margin: 20px 0 30px 0; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; display: flex; width: 100%;">';
 
-        // Color class map based on index
-        $color_classes = ["accent-1", "accent-2", "accent-3", "mixed"];
+        // Brand colors: Accent 1, Accent 2, Accent 3, and a 40% mix of Accent 1 with white (#AAC0E1)
+        $colors = ["#2B62B5", "#4189C9", "#61E0FA", "#AAC0E1"];
         $total_items = count($breakdown_data);
 
         foreach ($breakdown_data as $bd_index => $bd_item) {
-          $color_key = $color_classes[$bd_index % count($color_classes)];
-
+          $color = $colors[$bd_index % count($colors)];
           $width = (float) $bd_item["percentage"] . "%";
           $isFirst = $bd_index === 0;
           $isLast = $bd_index === $total_items - 1;
@@ -163,33 +162,41 @@ class MP_Content_Template
           $marginRight = $isLast ? "0" : "3px";
 
           $html .=
-            '<div class="mp-attribution-segment" style="--mp-bar-width: ' .
+            '<div style="width: ' .
             $width .
             "; margin-right: " .
             $marginRight .
-            ';">';
+            '; display: flex; flex-direction: column;">';
 
           // 1. THE COLORED BAR PIECE
-          $barClasses = "mp-attribution-bar mp-fill-" . $color_key;
+          $borderRadius = "";
           if ($isFirst) {
-            $barClasses .= " mp-attribution-bar-first";
+            $borderRadius .=
+              "border-top-left-radius: 6px; border-bottom-left-radius: 6px; ";
           }
           if ($isLast) {
-             $barClasses .= " mp-attribution-bar-last";
+            $borderRadius .=
+              "border-top-right-radius: 6px; border-bottom-right-radius: 6px; ";
           }
 
           $html .=
-            '<div class="' . $barClasses . '"></div>';
+            '<div style="height: 10px; background-color: ' .
+            $color .
+            "; " .
+            $borderRadius .
+            ' margin-bottom: 8px;"></div>';
 
           // 2. THE LABEL (Now perfectly aligned to the start of the bar segment)
           $html .=
-            '<div class="mp-attribution-label">';
+            '<div style="font-size: 0.85rem; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 5px;">';
           $html .=
-            '<strong class="mp-attribution-pct mp-text-' . $color_key . '">' .
+            '<strong style="color: ' .
+            $color .
+            '; font-weight: 700;">' .
             esc_html($bd_item["percentage"]) .
             "%</strong> ";
           $html .=
-            '<span class="mp-attribution-source">' .
+            '<span style="color: #777;">' .
             htmlspecialchars($bd_item["source"]) .
             "</span>";
           $html .= "</div>";
@@ -205,8 +212,8 @@ class MP_Content_Template
       $a_id = 'mp-a-' . $index;
 
       $html .=
-        '  <div id="' . esc_attr($a_id) . '" class="mp-a">';
-      $html .= wp_kses_post($answer);
+        '  <div id="' . esc_attr($a_id) . '" class="mp-a" style="border-left: 4px solid #2B62B5; padding: 0 0 0 30px; margin-left: 2px; color: #444; line-height: 1.8; font-size: 1.15rem;">';
+      $html .= $answer;
       $html .= "  </div>"; // Close Answer Box
 
       // Sources carousel
@@ -274,11 +281,11 @@ class MP_Content_Template
     // Related Questions
     if (!empty($related) && is_array($related)) {
       $html .=
-        '<div class="mp-related-box">';
+        '<div class="mp-related-box" style="margin-top: 80px; padding: 35px; background: #fdfdfd; border: 1px solid #eee; border-radius: 12px;">';
       $html .=
-        '  <h4 class="mp-related-title">Related Questions</h4>';
+        '  <h4 style="margin: 0 0 25px 0; font-size: 0.95rem; color: #888; font-weight: 800; text-transform: uppercase; letter-spacing: 0.15em;">Related Questions</h4>';
       $html .=
-        '  <div class="mp-related-list">';
+        '  <div class="mp-related-list" style="display: flex; flex-direction: column; gap: 12px;">';
 
       foreach ($related as $q) {
         $clean_q = $this->clean_lit_comments($q);
@@ -287,9 +294,9 @@ class MP_Content_Template
         $html .=
           '<a href="' .
           esc_url($url) .
-          '" class="mp-related-link">';
+          '" style="display: block; text-decoration: none; color: #2B62B5; font-size: 1.1rem; padding: 16px 20px; background: #fff; border: 1px solid #f0f0f0; border-radius: 8px; transition: background-color 0.2s ease;">';
         $html .=
-          '  <span class="mp-related-arrow">→</span> ' .
+          '  <span style="margin-right: 12px; color: #2B62B5; opacity: 0.4; font-weight: bold;">→</span> ' .
           esc_html($clean_q);
         $html .= "</a>";
       }

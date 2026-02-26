@@ -14,12 +14,139 @@ class MP_REST_Handler
    */
   public function register_routes()
   {
+    add_action('rest_api_init', [$this, 'setup_cors'], 15);
+
+    // don't mess with existing routes
     register_rest_route("milepoint-v1", "/generate-post", [
       "methods" => "POST",
       "callback" => [$this, "handle_ingest"],
       "permission_callback" => [$this, "check_permissions"],
     ]);
+
+    // New chatbot-post route
+    register_rest_route("milepoint-v1", "/chatbot-post", [
+      "methods" => "POST",
+      "callback" => [$this, "handle_chatbot_ingest"],
+      "permission_callback" => "__return_true", // Publicly accessible
+      "args" => [
+        "source" => [
+          "type" => "string",
+          "required" => true,
+        ],
+        "conversationId" => [
+          "type" => "string",
+          "required" => true,
+          "minLength" => 1,
+        ],
+        "url" => [
+          "type" => "string",
+          "required" => true,
+          "format" => "uri",
+        ],
+        "timestamp" => [
+          "type" => "string",
+          "required" => true,
+          "format" => "date-time",
+          "validate_callback" => function($param, $request, $key) {
+            $date = new DateTime($param);
+            return $date->format('Y') >= 2025; // Valid post 2025
+          }
+        ],
+        "messages" => [
+          "type" => "array",
+          "required" => true,
+          "minItems" => 1,
+          "items" => [
+            "type" => "object",
+            "properties" => [
+              "question" => ["type" => "string", "required" => true, "minLength" => 1],
+              "answerHtml" => ["type" => "string", "required" => true, "minLength" => 1],
+              "index" => ["type" => "integer"],
+            ]
+          ]
+        ],
+        "env" => ["type" => "string"] // Allowed but ignored
+      ]
+    ]);
   }
+
+  public function setup_cors() {
+    remove_filter('rest_pre_serve_request', 'rest_send_cors_headers');
+    add_filter('rest_pre_serve_request', function($value) {
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS, PUT, DELETE');
+        header('Access-Control-Allow-Credentials: true');
+        header('Access-Control-Allow-Headers: Authorization, Content-Type, X-WP-Nonce');
+
+        // If it's a preflight request, exit early with success
+        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+            status_header(200);
+            exit;
+        }
+
+        return $value;
+    });
+  }
+
+public function handle_chatbot_ingest($request) {
+    $params = $request->get_params();
+
+    // Extract and sanitize core fields
+    $conv_id   = sanitize_text_field($params['conversationId'] ?? '');
+    $source    = sanitize_text_field($params['source'] ?? '');
+    $url       = esc_url_raw($params['url'] ?? '');
+    $timestamp = sanitize_text_field($params['timestamp'] ?? '');
+    $messages  = $params['messages'] ?? []; // Array, no sanitization needed yet (handled by WP meta)
+
+    // 1. Find existing by meta to allow "Upsert"
+    $existing_posts = get_posts([
+        'post_type'      => 'milepoint-chat',
+        'meta_key'       => '_conversation_id',
+        'meta_value'     => $conv_id,
+        'posts_per_page' => 1,
+        'post_status'    => 'any'
+    ]);
+
+    // Use the first question as the title
+    $first_msg = $messages[0] ?? [];
+    $post_title = !empty($first_msg['question']) ? $first_msg['question'] : "Conversation " . $conv_id;
+
+    $post_data = [
+        'post_type'   => 'milepoint-chat',
+        'post_title'  => sanitize_text_field($post_title),
+        'post_status' => 'publish',
+        'post_date'   => date('Y-m-d H:i:s', strtotime($timestamp ?: 'now')),
+    ];
+
+    if (!empty($existing_posts)) {
+        $post_data['ID'] = $existing_posts[0]->ID;
+        $post_id = wp_update_post($post_data);
+        $action = 'updated';
+    } else {
+        $post_id = wp_insert_post($post_data);
+        $action = 'created';
+    }
+
+    if (is_wp_error($post_id)) {
+        return new WP_REST_Response(['status' => 'error', 'message' => $post_id->get_error_message()], 500);
+    }
+
+    // 2. Save ALL fields to postmeta
+    update_post_meta($post_id, '_conversation_id', $conv_id);
+    update_post_meta($post_id, '_source', $source);           // <--- Added
+    update_post_meta($post_id, '_source_url', $url);
+    update_post_meta($post_id, '_timestamp', $timestamp);     // <--- Added
+    update_post_meta($post_id, '_full_payload', $messages);
+
+    return new WP_REST_Response([
+        "status" => "ok",
+        "action" => $action,
+        "post_id" => $post_id,
+        "url" => get_permalink($post_id)
+    ], 200);
+  }
+
+
 
   /**
    * Only allow users who can edit posts
