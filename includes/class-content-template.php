@@ -165,7 +165,7 @@ class MP_Content_Template
             "%</strong> ";
           $html .=
             '<span class="mp-breakdown-source">' .
-            htmlspecialchars($bd_item["source"]) .
+            esc_html($bd_item["source"]) .
             "</span>";
           $html .= "</div>";
 
