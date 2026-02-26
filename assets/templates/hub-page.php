@@ -98,24 +98,15 @@ $base_url     = home_url('/q-and-a/');
       <div class="mp-hub-grid">
         <?php if (have_posts()) : while (have_posts()) : the_post(); ?>
             <article class="mp-hub-card">
-              <a href="<?php the_permalink(); ?>" class="mp-card-image">
-                <?php if (has_post_thumbnail()) : the_post_thumbnail('medium_large'); ?>
-                <?php else : ?>
-                  <div class="mp-placeholder">MilePoint Q&A</div>
-                <?php endif; ?>
-              </a>
+              <a class="mp-entry-link" href="<?php the_permalink(); ?>"></a>
+              <?php if (has_post_thumbnail()) : the_post_thumbnail('medium_large', array('class' => 'mp-card-image')); ?>
+              <?php else : ?>
+                <div class="mp-placeholder">MilePoint Q&A</div>
+              <?php endif; ?>
               <div class="mp-card-content">
                 <span class="mp-card-cat"><?php echo get_the_category()[0]->name ?? 'General'; ?></span>
-                <h3><a href="<?php the_permalink(); ?>"><?php the_title(); ?></a></h3>
+                <h3><?php the_title(); ?></h3>
                 <p><?php echo wp_trim_words(get_the_excerpt(), 18); ?></p>
-                <div class="mp-card-footer">
-                  <span>Read Query →</span>
-                  <div class="mp-trend-line">
-                    <svg width="60" height="20" viewBox="0 0 60 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M1 18L12 14L25 17L38 6L48 9L59 1" stroke="<?php echo ($current_sort === 'trending') ? '#ff4500' : '#4a90e2'; ?>" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                  </div>
-                </div>
               </div>
             </article>
           <?php endwhile;
