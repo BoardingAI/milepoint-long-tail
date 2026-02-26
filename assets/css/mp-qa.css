@@ -2,7 +2,7 @@
   --gist-color-brand-accent-1: #2B62B5;
   --gist-color-brand-accent-2: #4189C9;
   --gist-color-brand-accent-3: #61E0FA;
-  --gist-font-family-base: var(--global-body-font-family), sans-serif;
+  --gist-font-family-base: var(--global-body-font-family, sans-serif);
 }
 
 .single-milepoint_qa .entry-title {
