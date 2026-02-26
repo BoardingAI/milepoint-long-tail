@@ -147,10 +147,12 @@ class MP_Content_Template
 
         foreach ($breakdown_data as $bd_index => $bd_item) {
           $color_index = $bd_index % 4; // Using modulus 4 to cycle through 4 color variants
-          $width = (float) $bd_item["percentage"] . "%";
+          $raw_percentage = isset($bd_item["percentage"]) ? (float) $bd_item["percentage"] : 0.0;
+          $clamped_percentage = max(0, min(100, $raw_percentage));
+          $width = $clamped_percentage . "%";
 
           $html .=
-            '<div class="mp-breakdown-segment" style="width: ' . $width . ';">';
+            '<div class="mp-breakdown-segment" style="width: ' . esc_attr($width) . ';">';
 
           // 1. THE COLORED BAR PIECE
           $html .=

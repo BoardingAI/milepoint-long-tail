@@ -166,6 +166,16 @@
   transition: background-color 0.2s ease;
 }
 
+.mp-related-link:hover,
+.mp-related-link:focus-visible {
+  background: #f7fbff;
+}
+
+.mp-related-link:focus-visible {
+  outline: 2px solid var(--gist-color-brand-accent-2);
+  outline-offset: 2px;
+}
+
 .mp-related-arrow {
   margin-right: 12px;
   color: var(--gist-color-brand-accent-1);
