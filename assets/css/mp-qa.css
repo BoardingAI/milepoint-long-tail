@@ -371,6 +371,12 @@
   overflow: hidden;
 }
 
+.mp-hover-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
 /* Pointer triangle */
 #mp-hover-card::after {
   content: "";
