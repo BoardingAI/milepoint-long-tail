@@ -1,9 +1,48 @@
+:root {
+  --gist-color-brand-accent-1: #2B62B5!important;
+  --gist-color-brand-accent-2: #4189C9!important;
+  --gist-color-brand-accent-3: #61E0FA!important;
+  --gist-font-family-base: var(--global-body-font-family), sans-serif!important;
+}
+
 single-milepoint_qa .entry-title {
   display: none !important;
 }
+
+/* Main Container */
 .mp-qa-container {
-  margin-top: 50px;
+  margin: 0 auto;
+  margin-top: 50px; /* Kept from original CSS */
+  font-family: var(--gist-font-family-base);
 }
+
+.mp-qa-row {
+  margin-bottom: 60px;
+}
+
+.mp-qa-row:first-child .mp-q {
+  margin-top: 0;
+}
+
+/* Question Header */
+.mp-q {
+  color: var(--gist-color-brand-accent-1);
+  font-size: 2.1rem;
+  font-weight: 800;
+  margin: 0 0 20px 0;
+  line-height: 1.2;
+}
+
+/* Answer Content */
+.mp-a {
+  border-left: 4px solid var(--gist-color-brand-accent-1);
+  padding: 0 0 0 30px;
+  margin-left: 2px;
+  color: #444;
+  line-height: 1.8;
+  font-size: 1.15rem;
+}
+
 .mp-a h1,
 .mp-a h2,
 .mp-a h3,
@@ -13,9 +52,127 @@ single-milepoint_qa .entry-title {
   color: #111 !important;
   font-weight: 700 !important;
 }
-.mp-qa-row:first-child .mp-q {
-  margin-top: 0;
+
+/* Breakdown Bars */
+.mp-attribution-wrapper {
+  margin: 20px 0 30px 0;
+  font-family: var(--gist-font-family-base);
+  display: flex;
+  width: 100%;
 }
+
+.mp-breakdown-segment {
+  display: flex;
+  flex-direction: column;
+  margin-right: 3px;
+}
+
+.mp-breakdown-segment:last-child {
+  margin-right: 0;
+}
+
+.mp-breakdown-bar {
+  height: 10px;
+  margin-bottom: 8px;
+}
+
+.mp-breakdown-segment:first-child .mp-breakdown-bar {
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+}
+
+.mp-breakdown-segment:last-child .mp-breakdown-bar {
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+}
+
+.mp-breakdown-label {
+  font-size: 0.85rem;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 5px;
+}
+
+.mp-breakdown-percentage {
+  font-weight: 700;
+}
+
+.mp-breakdown-source {
+  color: #777;
+}
+
+/* Dynamic Breakdown Colors */
+.mp-bar-color-0 {
+  background-color: var(--gist-color-brand-accent-1);
+}
+.mp-bar-color-1 {
+  background-color: var(--gist-color-brand-accent-2);
+}
+.mp-bar-color-2 {
+  background-color: var(--gist-color-brand-accent-3);
+}
+.mp-bar-color-3 {
+  background-color: color-mix(in srgb, var(--gist-color-brand-accent-1, #000000) 40%, white);
+}
+.mp-text-color-0 {
+  color: var(--gist-color-brand-accent-1);
+}
+.mp-text-color-1 {
+  color: var(--gist-color-brand-accent-2);
+}
+.mp-text-color-2 {
+  color: var(--gist-color-brand-accent-3);
+}
+.mp-text-color-3 {
+  color: color-mix(in srgb, var(--gist-color-brand-accent-1, #000000) 40%, white);
+}
+
+
+/* Related Questions */
+.mp-related-box {
+  margin-top: 80px;
+  padding: 35px;
+  background: #fdfdfd;
+  border: 1px solid #eee;
+  border-radius: 12px;
+}
+
+.mp-related-header {
+  margin: 0 0 25px 0;
+  font-size: 0.95rem;
+  color: #888;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+}
+
+.mp-related-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mp-related-link {
+  display: block;
+  text-decoration: none;
+  color: var(--gist-color-brand-accent-1);
+  font-size: 1.1rem;
+  padding: 16px 20px;
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
+}
+
+.mp-related-arrow {
+  margin-right: 12px;
+  color: var(--gist-color-brand-accent-1);
+  opacity: 0.4;
+  font-weight: bold;
+}
+
 
 /* Sources Carousel */
 .mp-sources-wrapper {
@@ -240,4 +397,3 @@ single-milepoint_qa .entry-title {
 .mp-api-key-container .dashicons {
   margin-top: 4px;
 }
-
