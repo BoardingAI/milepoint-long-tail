@@ -24,13 +24,13 @@ class MP_Content_Template
         "mp-qa-style",
         plugins_url("../assets/css/mp-qa.css", __FILE__),
         [],
-        "1.0.5", // try to bump these every time
+        "1.0.9", // try to bump these every time
       );
       wp_enqueue_script(
         "mp-qa-hover",
         plugins_url("../assets/js/mp-qa-hover.js", __FILE__),
         [],
-        "1.0.5",
+        "1.0.9",
         true, // Load in footer
       );
     }
@@ -113,7 +113,7 @@ class MP_Content_Template
     $html = '<div id="mp-hover-card"></div>';
 
     $html .=
-      '<div class="mp-qa-container" style="max-width: 800px; margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;">';
+      '<div class="mp-qa-container" style="margin: 0 auto; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;">';
     // let's add the content as a json object so we can inspect it later
     $html .=
       '<script type="application/json" id="mp-qa-content">' .
@@ -121,6 +121,7 @@ class MP_Content_Template
       "</script>";
 
       // includes/class-content-template.php
+    $index = 0;
     foreach ($transcript as $item) {
       $question = $this->clean_lit_comments($item["question"]);
       $answer = $this->clean_lit_comments($item["answer"]);
@@ -129,10 +130,13 @@ class MP_Content_Template
       $html .= '<div class="mp-qa-row" style="margin-bottom: 60px;">';
 
       // MAIN HEADER: The Question
-      if (is_singular('milepoint_qa')) {
+      // Skip the first H2 because it duplicates the main H1 title
+      if (is_singular('milepoint_qa') && $index > 0) {
+        // ID for anchor linking (schema)
+        $q_id = 'mp-q-' . $index;
 
         $html .=
-          '  <h2 class="mp-q" style="color: #00457c; font-size: 2.1rem; font-weight: 800; margin: 0 0 20px 0; line-height: 1.2; letter-spacing: -0.03em;">' .
+          '  <h2 id="' . esc_attr($q_id) . '" class="mp-q" style="color: #2B62B5; font-size: 2.1rem; font-weight: 800; margin: 0 0 20px 0; line-height: 1.2;">' .
          $question .
           "</h2>";
       }
@@ -143,14 +147,15 @@ class MP_Content_Template
         $html .=
           '<div class="mp-attribution-wrapper" style="margin: 20px 0 30px 0; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; display: flex; width: 100%;">';
 
-        $colors = ["#00457c", "#0073aa", "#22a1c4", "#a5a5a5"];
+        // Brand colors: Accent 1, Accent 2, Accent 3, and a 40% mix of Accent 1 with white (#AAC0E1)
+        $colors = ["#2B62B5", "#4189C9", "#61E0FA", "#AAC0E1"];
         $total_items = count($breakdown_data);
 
-        foreach ($breakdown_data as $index => $item) {
-          $color = $colors[$index % count($colors)];
-          $width = $item["percentage"] . "%";
-          $isFirst = $index === 0;
-          $isLast = $index === $total_items - 1;
+        foreach ($breakdown_data as $bd_index => $bd_item) {
+          $color = $colors[$bd_index % count($colors)];
+          $width = (float) $bd_item["percentage"] . "%";
+          $isFirst = $bd_index === 0;
+          $isLast = $bd_index === $total_items - 1;
 
           // Each segment is a vertical flexbox (Bar on top, Label on bottom)
           // margin-right creates the white gap between segments
@@ -188,11 +193,11 @@ class MP_Content_Template
             '<strong style="color: ' .
             $color .
             '; font-weight: 700;">' .
-            $item["percentage"] .
+            esc_html($bd_item["percentage"]) .
             "%</strong> ";
           $html .=
             '<span style="color: #777;">' .
-            htmlspecialchars($item["source"]) .
+            htmlspecialchars($bd_item["source"]) .
             "</span>";
           $html .= "</div>";
 
@@ -203,8 +208,11 @@ class MP_Content_Template
       }
 
       // ANSWER BOX
+      // ID for anchor linking (schema)
+      $a_id = 'mp-a-' . $index;
+
       $html .=
-        '  <div class="mp-a" style="border-left: 4px solid #0073aa; padding: 0 0 0 30px; margin-left: 2px; color: #444; line-height: 1.8; font-size: 1.15rem;">';
+        '  <div id="' . esc_attr($a_id) . '" class="mp-a" style="border-left: 4px solid #2B62B5; padding: 0 0 0 30px; margin-left: 2px; color: #444; line-height: 1.8; font-size: 1.15rem;">';
       $html .= $answer;
       $html .= "  </div>"; // Close Answer Box
 
@@ -267,6 +275,7 @@ class MP_Content_Template
       }
 
       $html .= "</div>"; // Close Row
+      $index++;
     }
 
     // Related Questions
@@ -280,12 +289,16 @@ class MP_Content_Template
 
       foreach ($related as $q) {
         $clean_q = $this->clean_lit_comments($q);
+        $url = home_url('/chat/?q=' . urlencode($clean_q));
+
         $html .=
-          '<div style="color: #0073aa; font-size: 1.1rem; padding: 16px 20px; background: #fff; border: 1px solid #f0f0f0; border-radius: 8px;">';
+          '<a href="' .
+          esc_url($url) .
+          '" style="display: block; text-decoration: none; color: #2B62B5; font-size: 1.1rem; padding: 16px 20px; background: #fff; border: 1px solid #f0f0f0; border-radius: 8px; transition: background-color 0.2s ease;">';
         $html .=
-          '  <span style="margin-right: 12px; color: #0073aa; opacity: 0.4; font-weight: bold;">→</span> ' .
+          '  <span style="margin-right: 12px; color: #2B62B5; opacity: 0.4; font-weight: bold;">→</span> ' .
           esc_html($clean_q);
-        $html .= "</div>";
+        $html .= "</a>";
       }
 
       $html .= "  </div>";
