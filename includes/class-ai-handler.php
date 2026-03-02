@@ -39,27 +39,31 @@ class MP_AI_Handler
 
     if ($data && !empty($data['category'])) {
 
-      // 1. Ensure category is a string (in case AI returned an array)
-      $category_name = is_array($data['category']) ? $data['category'][0] : $data['category'];
+      // 1. Ensure category is a string and trim whitespace
+      $raw_category = is_array($data['category']) ? $data['category'][0] : $data['category'];
+      $category_name = sanitize_text_field(trim($raw_category));
 
-      // Save the raw string the AI generated
-      update_post_meta($ID, '_debug_ai_raw_category', $category_name);
+      // Save the raw string the AI generated (NO underscore so it's visible)
+      update_post_meta($ID, 'debug_ai_raw_category', $category_name);
 
-      // 2. Load admin functions if they are missing (for REST API / Gutenberg)
-      if (! function_exists('wp_create_category')) {
-        require_once ABSPATH . 'wp-admin/includes/taxonomy.php';
-      }
+      if (empty($category_name)) {
+          update_post_meta($ID, 'debug_ai_cat_id_result', 'Error: Category name is empty after extraction.');
+      } else {
+          // 2. Load admin functions if missing
+          if (! function_exists('wp_create_category')) {
+              require_once ABSPATH . 'wp-admin/includes/taxonomy.php';
+          }
 
-      // 3. Create or find the category
-      // wp_create_category is smart: it checks if it exists, creates it if not, and returns the ID.
-      $cat_id = wp_create_category($category_name);
+          // 3. Create or find the category
+          $cat_id = wp_create_category($category_name);
 
-      // Save the result of the wp_create_category attempt
-      update_post_meta($ID, '_debug_ai_cat_id_result', $cat_id);
-
-      if ($cat_id && !is_wp_error($cat_id)) {
-        // wp_set_post_categories requires an array of IDs
-        wp_set_post_categories($ID, [(int)$cat_id]);
+          // 4. Save the readable result (Handle WP_Error cleanly for CodeRabbit)
+          if (is_wp_error($cat_id)) {
+              update_post_meta($ID, 'debug_ai_cat_id_result', 'WP_Error: ' . $cat_id->get_error_message());
+          } else {
+              update_post_meta($ID, 'debug_ai_cat_id_result', 'Success ID: ' . $cat_id);
+              wp_set_post_categories($ID, [(int)$cat_id]);
+          }
       }
 
       // 4. Set Tags
