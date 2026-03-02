@@ -174,8 +174,8 @@
 }
 
 .mp-facet-group {
-    margin-bottom: 25px;
-    padding-bottom: 25px;
+    margin-bottom: 15px;
+    padding-bottom: 15px;
     border-bottom: 1px solid #e2e8f0;
 }
 
@@ -187,12 +187,17 @@
 
 .mp-facet-group summary {
     cursor: pointer;
-    margin-bottom: 15px;
+    padding: 6px 0; /* Add slight padding for touch target without huge margin */
+    margin-bottom: 0; /* Remove default margin when collapsed */
     list-style: none; /* Hide default marker */
     color: #888;
     display: flex;
     justify-content: space-between; /* Push icon to far right */
     align-items: center;
+}
+/* Only add space below summary when the details are open */
+.mp-facet-group[open] summary {
+    margin-bottom: 15px;
 }
 .mp-facet-group summary::-webkit-details-marker {
     display: none; /* Hide default marker in Safari */
