@@ -80,8 +80,8 @@ class MP_AI_Handler
   private function get_ai_suggestions($api_key, $title, $content)
     {
         // 1. Fetch existing taxonomy to nudge the AI
-        $existing_cats = get_mp_terms_with_counts('category');
-        $existing_tags = get_mp_terms_with_counts('post_tag');
+        $existing_cats = get_mp_terms_with_counts('category', false);
+        $existing_tags = get_mp_terms_with_counts('post_tag', false);
 
         // Convert to comma-separated strings
         $cat_list = !empty($existing_cats) ? implode(', ', array_column($existing_cats, 'name')) : 'None yet';

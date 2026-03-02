@@ -85,27 +85,42 @@ add_action("wp_enqueue_scripts", function () {
 });
 
 // let's put this here, we will use it for our facets as well as to nudge the ai classifier to choose already existing taxonomies
-function get_mp_terms_with_counts($taxonomy)
+function get_mp_terms_with_counts($taxonomy, $hide_empty = true)
 {
   global $wpdb;
 
-  // This query finds terms used by 'milepoint_qa' and calculates the specific count
-  $results = $wpdb->get_results(
-    $wpdb->prepare(
-      "
-            SELECT t.term_id, t.name, t.slug, COUNT(tr.object_id) as post_count
-            FROM {$wpdb->terms} t
-            INNER JOIN {$wpdb->term_taxonomy} tt ON t.term_id = tt.term_id
-            INNER JOIN {$wpdb->term_relationships} tr ON tt.term_taxonomy_id = tr.term_taxonomy_id
-            INNER JOIN {$wpdb->posts} p ON tr.object_id = p.ID
-            WHERE p.post_type = 'milepoint_qa'
+  if ($hide_empty) {
+    // Original query: only terms with published milepoint_qa posts
+    $query = "
+        SELECT t.term_id, t.name, t.slug, COUNT(tr.object_id) as post_count
+        FROM {$wpdb->terms} t
+        INNER JOIN {$wpdb->term_taxonomy} tt ON t.term_id = tt.term_id
+        INNER JOIN {$wpdb->term_relationships} tr ON tt.term_taxonomy_id = tr.term_taxonomy_id
+        INNER JOIN {$wpdb->posts} p ON tr.object_id = p.ID
+        WHERE p.post_type = 'milepoint_qa'
+        AND p.post_status = 'publish'
+        AND tt.taxonomy = %s
+        GROUP BY t.term_id
+        ORDER BY post_count DESC
+    ";
+  } else {
+    // Show all terms for the taxonomy, calculating count for milepoint_qa posts (0 if none)
+    $query = "
+        SELECT t.term_id, t.name, t.slug, COUNT(p.ID) as post_count
+        FROM {$wpdb->terms} t
+        INNER JOIN {$wpdb->term_taxonomy} tt ON t.term_id = tt.term_id
+        LEFT JOIN {$wpdb->term_relationships} tr ON tt.term_taxonomy_id = tr.term_taxonomy_id
+        LEFT JOIN {$wpdb->posts} p ON tr.object_id = p.ID
+            AND p.post_type = 'milepoint_qa'
             AND p.post_status = 'publish'
-            AND tt.taxonomy = %s
-            GROUP BY t.term_id
-            ORDER BY post_count DESC
-        ",
-      $taxonomy,
-    ),
+        WHERE tt.taxonomy = %s
+        GROUP BY t.term_id
+        ORDER BY post_count DESC, t.name ASC
+    ";
+  }
+
+  $results = $wpdb->get_results(
+    $wpdb->prepare($query, $taxonomy)
   );
 
   return $results;
