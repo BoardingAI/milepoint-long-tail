@@ -24,7 +24,7 @@ class MP_AI_Handler
     $transcript = get_post_meta($ID, '_raw_transcript', true);
     $breakdown = get_post_meta($ID, "_breakdown", true); // maybe tag with these??
 
-    $sample_content = is_array($transcript) ? $transcript[0]['answer'] : '';
+    $sample_content = (is_array($transcript) && isset($transcript[0]['answer'])) ? $transcript[0]['answer'] : '';
 
     // 3. Call OpenAI
     $response = $this->get_ai_suggestions($api_key, $title, $sample_content);
@@ -144,6 +144,9 @@ INSTRUCTIONS:
         if (is_wp_error($response)) return false;
 
         $body = json_decode(wp_remote_retrieve_body($response), true);
-        return $body['choices'][0]['message']['content'] ?? false;
+        if (!is_array($body) || empty($body['choices'][0]['message']['content'])) {
+            return false;
+        }
+        return $body['choices'][0]['message']['content'];
     }
 }
