@@ -34,8 +34,8 @@ $base_url     = home_url('/questions/');
     <!-- LEFT SIDEBAR: FACETS -->
     <aside class="mp-hub-sidebar">
       <!-- SORT BY SECTION -->
-      <div class="mp-facet-group">
-        <h4>Sort By</h4>
+      <details class="mp-facet-group mp-facet-details">
+        <summary><h4>Sort By</h4></summary>
         <div class="mp-facet-list">
           <a href="<?php echo esc_url(add_query_arg('sort', 'newest')); ?>"
             class="mp-facet-link <?php echo $current_sort === 'newest' ? 'active' : ''; ?>">
@@ -46,11 +46,11 @@ $base_url     = home_url('/questions/');
             Trending 🔥
           </a>
         </div>
-      </div>
+      </details>
 
       <!-- TOPICS SECTION -->
-      <div class="mp-facet-group">
-        <h4>Topics</h4>
+      <details class="mp-facet-group mp-facet-details">
+        <summary><h4>Topics</h4></summary>
         <div class="mp-facet-list">
           <a href="<?php echo esc_url($base_url); ?>" class="mp-facet-link <?php echo empty($current_cat) && empty($current_tag) ? 'active' : ''; ?>">
             All Queries
@@ -70,11 +70,11 @@ $base_url     = home_url('/questions/');
             </a>
           <?php endforeach; ?>
         </div>
-      </div>
+      </details>
 
       <!-- POPULAR TAGS SECTION -->
-      <div class="mp-facet-group">
-        <h4>Popular Tags</h4>
+      <details class="mp-facet-group mp-facet-details">
+        <summary><h4>Popular Tags</h4></summary>
         <div class="mp-facet-list">
           <?php
           $tags = get_mp_terms_with_counts('post_tag');
@@ -90,7 +90,7 @@ $base_url     = home_url('/questions/');
             </a>
           <?php endforeach; ?>
         </div>
-      </div>
+      </details>
     </aside>
 
     <!-- RIGHT CONTENT: GRID -->
@@ -117,5 +117,38 @@ $base_url     = home_url('/questions/');
     </main>
   </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const detailsElements = document.querySelectorAll('.mp-facet-details');
+
+    function updateDetailsState() {
+        const isDesktop = window.innerWidth > 768;
+        detailsElements.forEach(details => {
+            if (isDesktop) {
+                details.setAttribute('open', '');
+            } else {
+                details.removeAttribute('open');
+            }
+        });
+    }
+
+    // Run on initial load
+    updateDetailsState();
+
+    // Debounce the resize event for performance,
+    // and only trigger on width changes to prevent mobile scroll issues
+    let resizeTimer;
+    let lastWidth = window.innerWidth;
+
+    window.addEventListener('resize', function() {
+        if (window.innerWidth !== lastWidth) {
+            lastWidth = window.innerWidth;
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(updateDetailsState, 150);
+        }
+    });
+});
+</script>
 
 <?php get_footer(); ?>
