@@ -202,6 +202,9 @@
 .mp-facet-group summary::-webkit-details-marker {
     display: none; /* Hide default marker in Safari */
 }
+.mp-facet-group summary::marker {
+    content: ""; /* Hide default marker in Firefox/Chromium */
+}
 /* Modern outline chevron pointing down by default */
 .mp-facet-group summary::after {
     content: '';

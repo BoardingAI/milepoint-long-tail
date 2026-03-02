@@ -8,7 +8,15 @@ wp_enqueue_style(
   'mp-qa-hub-style',
   plugins_url('../css/mp-qa-hub.css', __FILE__),
   [],
-  time()
+  '1.0.13'
+);
+
+wp_enqueue_script(
+  'mp-qa-hub-script',
+  plugins_url('../js/mp-qa-hub.js', __FILE__),
+  [],
+  '1.0.13',
+  true
 );
 
 get_header();
@@ -19,9 +27,9 @@ $queried_object = get_queried_object();
 $current_tax_id = $queried_object->term_id ?? 0;
 
 
-$current_sort = $_GET['sort'] ?? 'newest';
-$current_cat  = $_GET['category_name'] ?? '';
-$current_tag  = $_GET['tag'] ?? '';
+$current_sort = isset($_GET['sort']) ? sanitize_key($_GET['sort']) : 'newest';
+$current_cat  = isset($_GET['category_name']) ? sanitize_text_field(wp_unslash($_GET['category_name'])) : '';
+$current_tag  = isset($_GET['tag']) ? sanitize_text_field(wp_unslash($_GET['tag'])) : '';
 $base_url     = get_post_type_archive_link('milepoint_qa') ?: home_url('/questions/');
 ?>
 
@@ -118,39 +126,5 @@ $base_url     = get_post_type_archive_link('milepoint_qa') ?: home_url('/questio
   </div>
 </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const detailsElements = document.querySelectorAll('.mp-facet-details');
-
-    function updateDetailsState() {
-        const isDesktop = window.innerWidth > 768;
-        detailsElements.forEach(details => {
-            if (isDesktop) {
-                details.setAttribute('open', '');
-            } else {
-                details.removeAttribute('open');
-            }
-        });
-    }
-
-    // Run on initial load
-    updateDetailsState();
-
-    // Debounce the resize event for performance,
-    // and only trigger on breakpoint state changes to prevent
-    // resetting toggles during mobile scroll/nav bar shifts
-    let resizeTimer;
-    let lastIsDesktop = window.innerWidth > 768;
-
-    window.addEventListener('resize', function() {
-        const currentIsDesktop = window.innerWidth > 768;
-        if (currentIsDesktop !== lastIsDesktop) {
-            lastIsDesktop = currentIsDesktop;
-            clearTimeout(resizeTimer);
-            resizeTimer = setTimeout(updateDetailsState, 150);
-        }
-    });
-});
-</script>
 
 <?php get_footer(); ?>
