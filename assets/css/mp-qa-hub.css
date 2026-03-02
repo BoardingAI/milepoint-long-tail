@@ -1,5 +1,17 @@
 /* hub page */
 
+:root {
+    --global-palette1: #4189c9;
+    --global-palette2: #3a69b1;
+    --global-palette3: #091e34;
+    --global-palette4: #26323e;
+    --global-palette5: #485666;
+    --global-palette6: #718096;
+    --global-palette7: #e0e7ef;
+    --global-palette8: #f4f5fa;
+    --global-palette9: #ffffff;
+}
+
 .mp-hub-wrapper { max-width: 1200px; margin: 40px auto; padding: 0 20px; }
 .mp-hub-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
 
@@ -8,7 +20,7 @@
     padding: 8px 16px; border: 1px solid #ddd; border-radius: 20px;
     text-decoration: none; color: #666; font-size: 14px; margin-right: 10px;
 }
-.mp-filter-group a.active { background: #0073aa; color: white; border-color: #0073aa; }
+.mp-filter-group a.active { background: var(--global-palette1); color: white; border-color: var(--global-palette1); }
 
 /* The Modern Grid */
 .mp-hub-grid {
@@ -43,7 +55,7 @@
 }
 
 .mp-card-content { padding: 20px; flex-grow: 1; width: 100%; }
-.mp-card-cat { color: #0073aa; font-weight: bold; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+.mp-card-cat { color: var(--global-palette1); font-weight: bold; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
 .mp-card-content h3 { margin: 10px 0; font-size: 1.25rem; line-height: 1.4; }
 .mp-card-content h3 a { color: #222; text-decoration: none; }
 
@@ -98,14 +110,14 @@
 }
 
 .mp-tag-pill:hover {
-    border-color: #0073aa;
-    color: #0073aa;
+    border-color: var(--global-palette1);
+    color: var(--global-palette1);
 }
 
 .mp-tag-pill.active {
-    background: #0073aa;
+    background: var(--global-palette1);
     color: #fff;
-    border-color: #0073aa;
+    border-color: var(--global-palette1);
 }
 
 .mp-tag-secondary {
@@ -128,37 +140,13 @@
 }
 
 .mp-sort-btn.active {
-    background: #0073aa;
+    background: var(--global-palette1);
     color: white;
-    border-color: #0073aa;
+    border-color: var(--global-palette1);
 }
-
-/* trend lines */
-.mp-card-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.mp-trend-line svg {
-    display: block;
-    opacity: 0.7;
-    filter: drop-shadow(0px 2px 2px rgba(0,0,0,0.1));
-}
-
-/* Make it "glow" when on the trending tab */
-.mp-sort-btn.active[href*="trending"] + .mp-hub-grid .mp-trend-line svg {
-    opacity: 1;
-}
-
-
-
-
-
 
 /* facet sidebar */
 
-/* Layout Container */
 /* Layout Container */
 .mp-hub-layout {
     display: grid;
@@ -169,14 +157,15 @@
 
 /* Sidebar Styling */
 .mp-hub-sidebar {
-    border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff; padding: 20px;
+    border: 1px solid var(--global-palette7); border-radius: 8px; background-color: #ffffff; padding: 20px;
+    height: fit-content;
 
 }
 
 .mp-facet-group {
     margin-bottom: 15px;
     padding-bottom: 15px;
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid var(--global-palette7);
 }
 
 .mp-facet-group:last-child {
@@ -187,20 +176,19 @@
 
 .mp-facet-group summary {
     cursor: pointer;
-    padding: 6px 0; /* Add slight padding for touch target without huge margin */
-    margin-bottom: 0; /* Remove default margin when collapsed */
-    list-style: none; /* Hide default marker */
-    color: #888;
+    padding: 6px 0;
+    margin-bottom: 0;
+    list-style: none;
     display: flex;
-    justify-content: space-between; /* Push icon to far right */
+    justify-content: space-between;
     align-items: center;
 }
-/* Only add space below summary when the details are open */
+
 .mp-facet-group[open] summary {
     margin-bottom: 15px;
 }
 .mp-facet-group summary::-webkit-details-marker {
-    display: none; /* Hide default marker in Safari */
+    display: none;
 }
 .mp-facet-group summary::marker {
     content: ""; /* Hide default marker in Firefox/Chromium */
@@ -210,24 +198,23 @@
     content: '';
     width: 8px;
     height: 8px;
-    border-right: 2px solid #888;
-    border-bottom: 2px solid #888;
+    border-right: 2px solid var(--global-palette6);
+    border-bottom: 2px solid var(--global-palette6);
     transform: rotate(45deg);
     transition: transform 0.3s ease;
-    margin-right: 4px; /* Slight visual tweak */
+    margin-right: 4px;
 }
 /* Chevron pointing up when details is open */
 .mp-facet-group[open] summary::after {
     transform: rotate(-135deg);
-    margin-top: 4px; /* Keep center alignment after rotation */
+    margin-top: 4px;
 }
 .mp-facet-group h4 {
     text-transform: uppercase;
     font-size: 12px;
     letter-spacing: 1px;
-    color: #888;
+    color: var(--global-palette6);
     margin: 0;
-    /* Removed inline-block and vertical-align since flex handles it */
 }
 
 .mp-facet-list {
@@ -238,7 +225,7 @@
 
 .mp-facet-link {
     text-decoration: none;
-    color: #333;
+    color: var(--global-palette4);
     font-size: 14px;
     padding: 6px 10px;
     border-radius: 4px;
@@ -249,12 +236,7 @@
 .mp-facet-link:hover,
 .mp-facet-link.active {
     background: #f0f7ff;
-    color: #0073aa;
-}
-
-.mp-facet-link .mp-count {
-    color: #aaa;
-    font-size: 12px;
+    color: var(--global-palette1);
 }
 
 /* Tag Cloud Facets */
@@ -270,7 +252,7 @@
 }
 
 .mp-facet-tag.active {
-    background: #0073aa;
+    background: var(--global-palette1);
     color: #fff;
 }
 
@@ -281,6 +263,14 @@
     }
     .mp-hub-sidebar {
         margin-bottom: 20px;
+    }
+
+    .mp-hub-card {
+        flex-direction: column;
+    }
+    .mp-card-image {
+        width: 100%;
+        height: 200px;
     }
 }
 
@@ -300,17 +290,17 @@
 
 .mp-facet-link:hover {
     background-color: #f8f9fa;
-    color: #0073aa;
+    color: var(--global-palette1);
 }
 
 /* The Bubble Count */
 .mp-count {
-    background-color: #e1ecf4; /* Light blue background */
-    color: #39739d;            /* Darker blue text */
+    background-color: #e1ecf4; 
+    color: var(--global-palette6);
     font-size: 11px;
     font-weight: 700;
     padding: 2px 8px;
-    border-radius: 20px;       /* Makes it round/pill shaped */
+    border-radius: 20px;       
     min-width: 24px;
     text-align: center;
     line-height: 1.4;
@@ -318,7 +308,7 @@
 
 /* Active State Colors */
 .mp-facet-link.active {
-    background-color: #0073aa;
+    background-color: var(--global-palette1);
     color: #ffffff !important;
 }
 
