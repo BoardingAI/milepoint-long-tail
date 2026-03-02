@@ -47,8 +47,15 @@ class MP_AI_Handler
         }
 
         $cat_ids = [];
-        foreach ($data['categories'] as $cat_name) {
-            $clean_name = sanitize_text_field(trim($cat_name));
+        // Limit to 3 items max
+        foreach (array_slice($data['categories'], 0, 3) as $cat_name) {
+            // Protect against AI returning nested arrays or objects
+            if (!is_scalar($cat_name)) {
+                continue;
+            }
+
+            $clean_name = sanitize_text_field(trim((string) $cat_name));
+
             if (!empty($clean_name)) {
                 $cat_id = wp_create_category($clean_name);
                 if (!is_wp_error($cat_id)) {
@@ -58,17 +65,34 @@ class MP_AI_Handler
         }
 
         if (!empty($cat_ids)) {
-            wp_set_post_categories($ID, $cat_ids);
+            // Deduplicate IDs just in case the AI repeated itself
+            wp_set_post_categories($ID, array_unique($cat_ids));
         }
     }
 
-    // 2. Process Tags (Now safely outside the categories block)
+    // 2. Process Tags
     if (!empty($data['tags']) && is_array($data['tags'])) {
-        // wp_set_post_tags is very forgiving; it accepts an array of strings
-        wp_set_post_tags($ID, $data['tags']);
+        $clean_tags = [];
+
+        // Limit to 5 items max
+        foreach (array_slice($data['tags'], 0, 5) as $tag_name) {
+            if (!is_scalar($tag_name)) {
+                continue;
+            }
+
+            $tag = sanitize_text_field(trim((string) $tag_name));
+            if ($tag !== '') {
+                $clean_tags[] = $tag;
+            }
+        }
+
+        if (!empty($clean_tags)) {
+            // Deduplicate the tags array
+            wp_set_post_tags($ID, array_values(array_unique($clean_tags)));
+        }
     }
 
-    // 3. Mark as processed (Now safely outside the categories block)
+    // 3. Mark as processed
     update_post_meta($ID, '_mp_ai_processed', true);
   }
 
