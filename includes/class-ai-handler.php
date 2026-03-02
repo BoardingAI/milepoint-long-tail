@@ -35,15 +35,18 @@ class MP_AI_Handler
      */
     $data = json_decode($response, true);
 
-    // it gets to here ok but then there is some problem and it fails to set the tags / category
+    // Early return if no data
+    if (!$data) {
+        return;
+    }
 
-    if ($data && !empty($data['categories']) && is_array($data['categories'])) {
+    // 1. Process Categories
+    if (!empty($data['categories']) && is_array($data['categories'])) {
         if (! function_exists('wp_create_category')) {
             require_once ABSPATH . 'wp-admin/includes/taxonomy.php';
         }
 
         $cat_ids = [];
-
         foreach ($data['categories'] as $cat_name) {
             $clean_name = sanitize_text_field(trim($cat_name));
             if (!empty($clean_name)) {
@@ -57,16 +60,16 @@ class MP_AI_Handler
         if (!empty($cat_ids)) {
             wp_set_post_categories($ID, $cat_ids);
         }
+    }
 
-      // 4. Set Tags
-      if (!empty($data['tags']) && is_array($data['tags'])) {
+    // 2. Process Tags (Now safely outside the categories block)
+    if (!empty($data['tags']) && is_array($data['tags'])) {
         // wp_set_post_tags is very forgiving; it accepts an array of strings
         wp_set_post_tags($ID, $data['tags']);
-      }
-
-      // Mark as processed
-      update_post_meta($ID, '_mp_ai_processed', true);
     }
+
+    // 3. Mark as processed (Now safely outside the categories block)
+    update_post_meta($ID, '_mp_ai_processed', true);
   }
 
   private function get_ai_suggestions($api_key, $title, $content)
