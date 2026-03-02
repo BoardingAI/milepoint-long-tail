@@ -22,12 +22,12 @@ $current_tax_id = $queried_object->term_id ?? 0;
 $current_sort = $_GET['sort'] ?? 'newest';
 $current_cat  = $_GET['category_name'] ?? '';
 $current_tag  = $_GET['tag'] ?? '';
-$base_url     = home_url('/questions/');
+$base_url     = get_post_type_archive_link('milepoint_qa') ?: home_url('/questions/');
 ?>
 
 <div class="mp-hub-wrapper">
   <header class="mp-hub-header">
-    <h2 class="kt-adv-heading177_7f7566-76 wp-block-kadence-advancedheading has-theme-palette-3-color has-text-color" data-kb-block="kb-adv-heading177_7f7566-76"><mark style="background-color:rgba(0, 0, 0, 0)" class="has-inline-color has-theme-palette-1-color">#asked</mark> &amp; <mark style="background-color:rgba(0, 0, 0, 0)" class="has-inline-color has-theme-palette-1-color">#answered</mark> questions</h2>
+    <h1 class="kt-adv-heading177_7f7566-76 wp-block-kadence-advancedheading has-theme-palette-3-color has-text-color" data-kb-block="kb-adv-heading177_7f7566-76"><mark style="background-color:rgba(0, 0, 0, 0)" class="has-inline-color has-theme-palette-1-color">#asked</mark> &amp; <mark style="background-color:rgba(0, 0, 0, 0)" class="has-inline-color has-theme-palette-1-color">#answered</mark> questions</h1>
   </header>
 
   <div class="mp-hub-layout">
@@ -137,13 +137,15 @@ document.addEventListener('DOMContentLoaded', function() {
     updateDetailsState();
 
     // Debounce the resize event for performance,
-    // and only trigger on width changes to prevent mobile scroll issues
+    // and only trigger on breakpoint state changes to prevent
+    // resetting toggles during mobile scroll/nav bar shifts
     let resizeTimer;
-    let lastWidth = window.innerWidth;
+    let lastIsDesktop = window.innerWidth > 768;
 
     window.addEventListener('resize', function() {
-        if (window.innerWidth !== lastWidth) {
-            lastWidth = window.innerWidth;
+        const currentIsDesktop = window.innerWidth > 768;
+        if (currentIsDesktop !== lastIsDesktop) {
+            lastIsDesktop = currentIsDesktop;
             clearTimeout(resizeTimer);
             resizeTimer = setTimeout(updateDetailsState, 150);
         }

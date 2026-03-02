@@ -178,24 +178,11 @@
 }
 
 .mp-facet-group summary {
-    list-style: none; /* Remove default triangle in standard browsers */
     cursor: pointer;
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 8px; /* space between native marker and h4 */
     margin-bottom: 15px;
-}
-.mp-facet-group summary::-webkit-details-marker {
-    display: none; /* Remove default triangle in Safari */
-}
-.mp-facet-group summary::after {
-    content: '▼';
-    font-size: 10px;
-    color: #888;
-    transition: transform 0.2s ease;
-}
-.mp-facet-group[open] summary::after {
-    transform: rotate(180deg);
 }
 .mp-facet-group h4 {
     text-transform: uppercase;
@@ -203,6 +190,7 @@
     letter-spacing: 1px;
     color: #888;
     margin: 0;
+    display: inline-block;
 }
 
 .mp-facet-list {
