@@ -42,7 +42,8 @@ class MP_AI_Handler
       // 1. Ensure category is a string (in case AI returned an array)
       $category_name = is_array($data['category']) ? $data['category'][0] : $data['category'];
 
-      error_log("MilePoint AI Category Assignment - Raw category string from AI: " . print_r($category_name, true));
+      // Save the raw string the AI generated
+      update_post_meta($ID, '_debug_ai_raw_category', $category_name);
 
       // 2. Load admin functions if they are missing (for REST API / Gutenberg)
       if (! function_exists('wp_create_category')) {
@@ -53,7 +54,8 @@ class MP_AI_Handler
       // wp_create_category is smart: it checks if it exists, creates it if not, and returns the ID.
       $cat_id = wp_create_category($category_name);
 
-      error_log("MilePoint AI Category Assignment - wp_create_category result: " . print_r($cat_id, true));
+      // Save the result of the wp_create_category attempt
+      update_post_meta($ID, '_debug_ai_cat_id_result', $cat_id);
 
       if ($cat_id && !is_wp_error($cat_id)) {
         // wp_set_post_categories requires an array of IDs
