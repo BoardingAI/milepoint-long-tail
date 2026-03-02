@@ -37,34 +37,37 @@ class MP_AI_Handler
 
     // it gets to here ok but then there is some problem and it fails to set the tags / category
 
-    if ($data && !empty($data['category'])) {
+    if ($data && !empty($data['categories']) && is_array($data['categories'])) {
 
-      // 1. Ensure category is a string and trim whitespace
-      $raw_category = is_array($data['category']) ? $data['category'][0] : $data['category'];
-      $category_name = sanitize_text_field(trim($raw_category));
+        // Save raw array for debugging
+        update_post_meta($ID, 'debug_ai_raw_category', implode(', ', $data['categories']));
 
-      // Save the raw string the AI generated (NO underscore so it's visible)
-      update_post_meta($ID, 'debug_ai_raw_category', $category_name);
+        if (! function_exists('wp_create_category')) {
+            require_once ABSPATH . 'wp-admin/includes/taxonomy.php';
+        }
 
-      if (empty($category_name)) {
-          update_post_meta($ID, 'debug_ai_cat_id_result', 'Error: Category name is empty after extraction.');
-      } else {
-          // 2. Load admin functions if missing
-          if (! function_exists('wp_create_category')) {
-              require_once ABSPATH . 'wp-admin/includes/taxonomy.php';
-          }
+        $cat_ids = [];
+        $debug_results = [];
 
-          // 3. Create or find the category
-          $cat_id = wp_create_category($category_name);
+        foreach ($data['categories'] as $cat_name) {
+            $clean_name = sanitize_text_field(trim($cat_name));
+            if (!empty($clean_name)) {
+                $cat_id = wp_create_category($clean_name);
+                if (!is_wp_error($cat_id)) {
+                    $cat_ids[] = (int)$cat_id;
+                    $debug_results[] = "Success: $clean_name ($cat_id)";
+                } else {
+                    $debug_results[] = "Error $clean_name: " . $cat_id->get_error_message();
+                }
+            }
+        }
 
-          // 4. Save the readable result (Handle WP_Error cleanly for CodeRabbit)
-          if (is_wp_error($cat_id)) {
-              update_post_meta($ID, 'debug_ai_cat_id_result', 'WP_Error: ' . $cat_id->get_error_message());
-          } else {
-              update_post_meta($ID, 'debug_ai_cat_id_result', 'Success ID: ' . $cat_id);
-              wp_set_post_categories($ID, [(int)$cat_id]);
-          }
-      }
+        // Save debug results
+        update_post_meta($ID, 'debug_ai_cat_id_result', implode(' | ', $debug_results));
+
+        if (!empty($cat_ids)) {
+            wp_set_post_categories($ID, $cat_ids);
+        }
 
       // 4. Set Tags
       if (!empty($data['tags']) && is_array($data['tags'])) {
@@ -88,7 +91,7 @@ class MP_AI_Handler
         $tag_list = !empty($existing_tags) ? implode(', ', array_column($existing_tags, 'name')) : 'None yet';
 
         // 2. Updated prompt with "Prefer existing" instructions
-        $prompt = "You are a travel rewards expert. Categorize this Q&A into 1 category and up to 5 tags.
+        $prompt = "You are a travel rewards expert. Categorize this Q&A into 1 to 3 categories and up to 5 tags.
 
 Title: {$title}
 Content Sample: {$content}
@@ -98,10 +101,9 @@ EXISTING CATEGORIES: {$cat_list}
 EXISTING TAGS: {$tag_list}
 
 INSTRUCTIONS:
-1. Evaluate the EXISTING CATEGORIES. If one is a HIGHLY SPECIFIC and perfect match, use it.
-2. Do NOT default to broad, catch-all categories (like 'Travel' or 'Uncategorized') if a more specific category (like 'Cruises' or 'Hotels') would be better. You are highly encouraged to create a NEW, specific category if the existing ones are too broad.
-3. Favor EXISTING TAGS where applicable to maintain taxonomy consistency.
-4. Return ONLY a JSON object with keys 'category' (string) and 'tags' (array of strings).";
+1. Evaluate the EXISTING CATEGORIES. You may use broad existing categories (like 'Travel'), but you MUST also create specific NEW categories (like 'Cruises' or 'Credit Cards') if the topic warrants it.
+2. Favor EXISTING TAGS where applicable to maintain taxonomy consistency.
+3. Return ONLY a JSON object with keys 'categories' (array of strings, max 3) and 'tags' (array of strings).";
 
         $response = wp_remote_post('https://api.openai.com/v1/chat/completions', [
             'headers' => [
@@ -111,6 +113,7 @@ INSTRUCTIONS:
             'timeout' => 15,
             'body'    => json_encode([
                 'model' => 'gpt-4o-mini',
+                'temperature' => 0.7,
                 'messages' => [['role' => 'user', 'content' => $prompt]],
                 'response_format' => ['type' => 'json_object']
             ])
