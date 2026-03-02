@@ -24,13 +24,13 @@ class MP_Content_Template
         "mp-qa-style",
         plugins_url("../assets/css/mp-qa.css", __FILE__),
         [],
-        "1.0.13", // try to bump these every time
+        "1.0.12", // try to bump these every time
       );
       wp_enqueue_script(
         "mp-qa-hover",
         plugins_url("../assets/js/mp-qa-hover.js", __FILE__),
         [],
-        "1.0.13",
+        "1.0.12",
         true, // Load in footer
       );
     }

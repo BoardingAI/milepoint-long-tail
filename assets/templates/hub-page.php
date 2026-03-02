@@ -8,14 +8,14 @@ wp_enqueue_style(
   'mp-qa-hub-style',
   plugins_url('../css/mp-qa-hub.css', __FILE__),
   [],
-  '1.0.13'
+  '1.0.12'
 );
 
 wp_enqueue_script(
   'mp-qa-hub-script',
   plugins_url('../js/mp-qa-hub.js', __FILE__),
   [],
-  '1.0.13',
+  '1.0.12',
   true
 );
 
