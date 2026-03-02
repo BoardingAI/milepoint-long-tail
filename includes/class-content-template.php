@@ -30,7 +30,7 @@ class MP_Content_Template
         "mp-qa-hover",
         plugins_url("../assets/js/mp-qa-hover.js", __FILE__),
         [],
-        "1.0.11",
+        "1.0.12",
         true, // Load in footer
       );
     }

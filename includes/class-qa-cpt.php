@@ -64,8 +64,8 @@ class MP_QA_CPT_Handler
         "add_new_item" => "Add New Q&A Article",
       ],
       "public" => true,
-      "has_archive" => "q-and-a",
-      "rewrite" => ["slug" => "q-and-a"],
+      "has_archive" => "questions",
+      "rewrite" => ["slug" => "questions"],
       "show_in_rest" => true, // Enables Gutenberg and REST API access
       "taxonomies" => ["category", "post_tag"],
       "supports" => [

@@ -22,12 +22,12 @@ $current_tax_id = $queried_object->term_id ?? 0;
 $current_sort = $_GET['sort'] ?? 'newest';
 $current_cat  = $_GET['category_name'] ?? '';
 $current_tag  = $_GET['tag'] ?? '';
-$base_url     = home_url('/q-and-a/');
+$base_url     = home_url('/questions/');
 ?>
 
 <div class="mp-hub-wrapper">
   <header class="mp-hub-header">
-    <h1>Reader Q&A Hub</h1>
+    <h2 class="kt-adv-heading177_7f7566-76 wp-block-kadence-advancedheading has-theme-palette-3-color has-text-color" data-kb-block="kb-adv-heading177_7f7566-76"><mark style="background-color:rgba(0, 0, 0, 0)" class="has-inline-color has-theme-palette-1-color">#asked</mark> &amp; <mark style="background-color:rgba(0, 0, 0, 0)" class="has-inline-color has-theme-palette-1-color">#answered</mark> questions</h2>
   </header>
 
   <div class="mp-hub-layout">
