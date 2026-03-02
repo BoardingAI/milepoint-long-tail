@@ -35,8 +35,9 @@ class MP_AI_Handler
      */
     $data = json_decode($response, true);
 
-    // Early return if no data
+    // Early return if no data, but mark as processed so it doesn't infinite loop
     if (!$data) {
+        update_post_meta($ID, '_mp_ai_processed', 'no_data');
         return;
     }
 
