@@ -169,20 +169,65 @@
 
 /* Sidebar Styling */
 .mp-hub-sidebar {
-    border-right: 1px solid #eee;
-    padding-right: 20px;
+    border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff; padding: 20px;
+
 }
 
 .mp-facet-group {
-    margin-bottom: 30px;
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e2e8f0;
 }
 
+.mp-facet-group:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.mp-facet-group summary {
+    cursor: pointer;
+    padding: 6px 0; /* Add slight padding for touch target without huge margin */
+    margin-bottom: 0; /* Remove default margin when collapsed */
+    list-style: none; /* Hide default marker */
+    color: #888;
+    display: flex;
+    justify-content: space-between; /* Push icon to far right */
+    align-items: center;
+}
+/* Only add space below summary when the details are open */
+.mp-facet-group[open] summary {
+    margin-bottom: 15px;
+}
+.mp-facet-group summary::-webkit-details-marker {
+    display: none; /* Hide default marker in Safari */
+}
+.mp-facet-group summary::marker {
+    content: ""; /* Hide default marker in Firefox/Chromium */
+}
+/* Modern outline chevron pointing down by default */
+.mp-facet-group summary::after {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid #888;
+    border-bottom: 2px solid #888;
+    transform: rotate(45deg);
+    transition: transform 0.3s ease;
+    margin-right: 4px; /* Slight visual tweak */
+}
+/* Chevron pointing up when details is open */
+.mp-facet-group[open] summary::after {
+    transform: rotate(-135deg);
+    margin-top: 4px; /* Keep center alignment after rotation */
+}
 .mp-facet-group h4 {
     text-transform: uppercase;
     font-size: 12px;
     letter-spacing: 1px;
     color: #888;
-    margin-bottom: 15px;
+    margin: 0;
+    /* Removed inline-block and vertical-align since flex handles it */
 }
 
 .mp-facet-list {
@@ -235,9 +280,7 @@
         grid-template-columns: 1fr; /* Stacks sidebar on top of grid on mobile */
     }
     .mp-hub-sidebar {
-        border-right: none;
-        border-bottom: 1px solid #eee;
-        padding-bottom: 20px;
+        margin-bottom: 20px;
     }
 }
 

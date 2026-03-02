@@ -8,7 +8,15 @@ wp_enqueue_style(
   'mp-qa-hub-style',
   plugins_url('../css/mp-qa-hub.css', __FILE__),
   [],
-  time()
+  '1.0.12'
+);
+
+wp_enqueue_script(
+  'mp-qa-hub-script',
+  plugins_url('../js/mp-qa-hub.js', __FILE__),
+  [],
+  '1.0.12',
+  true
 );
 
 get_header();
@@ -19,23 +27,23 @@ $queried_object = get_queried_object();
 $current_tax_id = $queried_object->term_id ?? 0;
 
 
-$current_sort = $_GET['sort'] ?? 'newest';
-$current_cat  = $_GET['category_name'] ?? '';
-$current_tag  = $_GET['tag'] ?? '';
-$base_url     = home_url('/q-and-a/');
+$current_sort = isset($_GET['sort']) ? sanitize_key($_GET['sort']) : 'newest';
+$current_cat  = isset($_GET['category_name']) ? sanitize_text_field(wp_unslash($_GET['category_name'])) : '';
+$current_tag  = isset($_GET['tag']) ? sanitize_text_field(wp_unslash($_GET['tag'])) : '';
+$base_url     = get_post_type_archive_link('milepoint_qa') ?: home_url('/questions/');
 ?>
 
 <div class="mp-hub-wrapper">
   <header class="mp-hub-header">
-    <h1>Reader Q&A Hub</h1>
+    <h1 class="kt-adv-heading177_7f7566-76 wp-block-kadence-advancedheading has-theme-palette-3-color has-text-color" data-kb-block="kb-adv-heading177_7f7566-76"><mark style="background-color:rgba(0, 0, 0, 0)" class="has-inline-color has-theme-palette-1-color">#asked</mark> &amp; <mark style="background-color:rgba(0, 0, 0, 0)" class="has-inline-color has-theme-palette-1-color">#answered</mark> questions</h1>
   </header>
 
   <div class="mp-hub-layout">
     <!-- LEFT SIDEBAR: FACETS -->
     <aside class="mp-hub-sidebar">
       <!-- SORT BY SECTION -->
-      <div class="mp-facet-group">
-        <h4>Sort By</h4>
+      <details class="mp-facet-group mp-facet-details">
+        <summary><h4>Sort By</h4></summary>
         <div class="mp-facet-list">
           <a href="<?php echo esc_url(add_query_arg('sort', 'newest')); ?>"
             class="mp-facet-link <?php echo $current_sort === 'newest' ? 'active' : ''; ?>">
@@ -46,11 +54,11 @@ $base_url     = home_url('/q-and-a/');
             Trending 🔥
           </a>
         </div>
-      </div>
+      </details>
 
       <!-- TOPICS SECTION -->
-      <div class="mp-facet-group">
-        <h4>Topics</h4>
+      <details class="mp-facet-group mp-facet-details">
+        <summary><h4>Topics</h4></summary>
         <div class="mp-facet-list">
           <a href="<?php echo esc_url($base_url); ?>" class="mp-facet-link <?php echo empty($current_cat) && empty($current_tag) ? 'active' : ''; ?>">
             All Queries
@@ -70,11 +78,11 @@ $base_url     = home_url('/q-and-a/');
             </a>
           <?php endforeach; ?>
         </div>
-      </div>
+      </details>
 
       <!-- POPULAR TAGS SECTION -->
-      <div class="mp-facet-group">
-        <h4>Popular Tags</h4>
+      <details class="mp-facet-group mp-facet-details">
+        <summary><h4>Popular Tags</h4></summary>
         <div class="mp-facet-list">
           <?php
           $tags = get_mp_terms_with_counts('post_tag');
@@ -90,7 +98,7 @@ $base_url     = home_url('/q-and-a/');
             </a>
           <?php endforeach; ?>
         </div>
-      </div>
+      </details>
     </aside>
 
     <!-- RIGHT CONTENT: GRID -->
@@ -117,5 +125,6 @@ $base_url     = home_url('/q-and-a/');
     </main>
   </div>
 </div>
+
 
 <?php get_footer(); ?>
