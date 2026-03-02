@@ -188,11 +188,30 @@
 .mp-facet-group summary {
     cursor: pointer;
     margin-bottom: 15px;
-    list-style: disclosure-closed; /* Ensure native marker works cross-browser */
-    color: #888; /* Color the marker arrow */
+    list-style: none; /* Hide default marker */
+    color: #888;
+    display: flex;
+    justify-content: space-between; /* Push icon to far right */
+    align-items: center;
 }
-.mp-facet-group[open] summary {
-    list-style: disclosure-open;
+.mp-facet-group summary::-webkit-details-marker {
+    display: none; /* Hide default marker in Safari */
+}
+/* Modern outline chevron pointing down by default */
+.mp-facet-group summary::after {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid #888;
+    border-bottom: 2px solid #888;
+    transform: rotate(45deg);
+    transition: transform 0.3s ease;
+    margin-right: 4px; /* Slight visual tweak */
+}
+/* Chevron pointing up when details is open */
+.mp-facet-group[open] summary::after {
+    transform: rotate(-135deg);
+    margin-top: 4px; /* Keep center alignment after rotation */
 }
 .mp-facet-group h4 {
     text-transform: uppercase;
@@ -200,8 +219,7 @@
     letter-spacing: 1px;
     color: #888;
     margin: 0;
-    display: inline-block;
-    vertical-align: middle;
+    /* Removed inline-block and vertical-align since flex handles it */
 }
 
 .mp-facet-list {
