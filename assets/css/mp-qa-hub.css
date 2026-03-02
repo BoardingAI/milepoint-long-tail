@@ -169,20 +169,30 @@
 
 /* Sidebar Styling */
 .mp-hub-sidebar {
-    border-right: 1px solid #eee;
-    padding-right: 20px;
+    border: 1px solid #e2e8f0; border-radius: 8px; background-color: #ffffff; padding: 20px;
+
 }
 
 .mp-facet-group {
-    margin-bottom: 30px;
+    margin-bottom: 25px;
+    padding-bottom: 25px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.mp-facet-group:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
 }
 
 .mp-facet-group summary {
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 8px; /* space between native marker and h4 */
     margin-bottom: 15px;
+    list-style: disclosure-closed; /* Ensure native marker works cross-browser */
+    color: #888; /* Color the marker arrow */
+}
+.mp-facet-group[open] summary {
+    list-style: disclosure-open;
 }
 .mp-facet-group h4 {
     text-transform: uppercase;
@@ -191,6 +201,7 @@
     color: #888;
     margin: 0;
     display: inline-block;
+    vertical-align: middle;
 }
 
 .mp-facet-list {
@@ -243,9 +254,7 @@
         grid-template-columns: 1fr; /* Stacks sidebar on top of grid on mobile */
     }
     .mp-hub-sidebar {
-        border-right: none;
-        border-bottom: 1px solid #eee;
-        padding-bottom: 20px;
+        margin-bottom: 20px;
     }
 }
 
