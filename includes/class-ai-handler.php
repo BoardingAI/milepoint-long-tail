@@ -38,16 +38,11 @@ class MP_AI_Handler
     // it gets to here ok but then there is some problem and it fails to set the tags / category
 
     if ($data && !empty($data['categories']) && is_array($data['categories'])) {
-
-        // Save raw array for debugging
-        update_post_meta($ID, 'debug_ai_raw_category', implode(', ', $data['categories']));
-
         if (! function_exists('wp_create_category')) {
             require_once ABSPATH . 'wp-admin/includes/taxonomy.php';
         }
 
         $cat_ids = [];
-        $debug_results = [];
 
         foreach ($data['categories'] as $cat_name) {
             $clean_name = sanitize_text_field(trim($cat_name));
@@ -55,15 +50,9 @@ class MP_AI_Handler
                 $cat_id = wp_create_category($clean_name);
                 if (!is_wp_error($cat_id)) {
                     $cat_ids[] = (int)$cat_id;
-                    $debug_results[] = "Success: $clean_name ($cat_id)";
-                } else {
-                    $debug_results[] = "Error $clean_name: " . $cat_id->get_error_message();
                 }
             }
         }
-
-        // Save debug results
-        update_post_meta($ID, 'debug_ai_cat_id_result', implode(' | ', $debug_results));
 
         if (!empty($cat_ids)) {
             wp_set_post_categories($ID, $cat_ids);
@@ -83,8 +72,8 @@ class MP_AI_Handler
   private function get_ai_suggestions($api_key, $title, $content)
     {
         // 1. Fetch existing taxonomy to nudge the AI
-        $existing_cats = get_mp_terms_with_counts('category', false);
-        $existing_tags = get_mp_terms_with_counts('post_tag', false);
+        $existing_cats = array_slice((array) get_mp_terms_with_counts('category', false), 0, 200);
+        $existing_tags = array_slice((array) get_mp_terms_with_counts('post_tag', false), 0, 300);
 
         // Convert to comma-separated strings
         $cat_list = !empty($existing_cats) ? implode(', ', array_column($existing_cats, 'name')) : 'None yet';
