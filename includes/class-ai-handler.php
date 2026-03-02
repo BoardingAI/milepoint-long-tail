@@ -29,14 +29,19 @@ class MP_AI_Handler
     // 3. Call OpenAI
     $response = $this->get_ai_suggestions($api_key, $title, $sample_content);
 
+    // 1. Handle Transport/API Errors (Do NOT mark as processed, allow retry)
+    if ($response === false) {
+        update_post_meta($ID, '_mp_ai_last_error', 'openai_request_failed_or_timeout');
+        return;
+    }
+
     /**
      * XDEBUG BREAKPOINT:
      * Set a breakpoint on the line below ($data) to inspect the AI response
      */
+    // 2. Handle Parsing Errors / Genuinely Empty Data (Mark as processed, do not retry)
     $data = json_decode($response, true);
-
-    // Early return if no data, but mark as processed so it doesn't infinite loop
-    if (!$data) {
+    if (!is_array($data)) {
         update_post_meta($ID, '_mp_ai_processed', 'no_data');
         return;
     }
