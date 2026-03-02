@@ -98,9 +98,10 @@ EXISTING CATEGORIES: {$cat_list}
 EXISTING TAGS: {$tag_list}
 
 INSTRUCTIONS:
-1. If one of the EXISTING CATEGORIES fits this content, you MUST use it. Only create a new category if none of the existing ones are relevant.
-2. Favor EXISTING TAGS where applicable to maintain taxonomy consistency.
-3. Return ONLY a JSON object with keys 'category' (string) and 'tags' (array of strings).";
+1. Evaluate the EXISTING CATEGORIES. If one is a HIGHLY SPECIFIC and perfect match, use it.
+2. Do NOT default to broad, catch-all categories (like 'Travel' or 'Uncategorized') if a more specific category (like 'Cruises' or 'Hotels') would be better. You are highly encouraged to create a NEW, specific category if the existing ones are too broad.
+3. Favor EXISTING TAGS where applicable to maintain taxonomy consistency.
+4. Return ONLY a JSON object with keys 'category' (string) and 'tags' (array of strings).";
 
         $response = wp_remote_post('https://api.openai.com/v1/chat/completions', [
             'headers' => [
