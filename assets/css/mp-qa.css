@@ -1,8 +1,9 @@
 :root {
-  --gist-color-brand-accent-1: #2B62B5;
+  --gist-color-brand-accent-1: #3B629D;
   --gist-color-brand-accent-2: #4189C9;
-  --gist-color-brand-accent-3: #61E0FA;
-  --gist-font-family-base: var(--global-body-font-family, sans-serif);
+  --gist-color-brand-accent-3: #7CB2E2;
+  --gist-color-brand-accent-4: #B5DAF9;
+  --gist-font-family-base: var(--global-body-font-family), sans-serif;
 }
 
 /* Main Container */
@@ -31,9 +32,6 @@
 
 /* Answer Content */
 .mp-a {
-  border-left: 4px solid var(--gist-color-brand-accent-1);
-  padding: 0 0 0 30px;
-  margin-left: 2px;
   color: #444;
   line-height: 1.8;
   font-size: 1.15rem;
@@ -68,7 +66,7 @@
 }
 
 .mp-breakdown-bar {
-  height: 10px;
+  height: 6px;
   margin-bottom: 8px;
 }
 
@@ -109,9 +107,8 @@
 .mp-bar-color-2 {
   background-color: var(--gist-color-brand-accent-3);
 }
-.mp-bar-color-3 {
-  background-color: #AAC0E1; /* Fallback (approx 40% accent mix) */
-  background-color: color-mix(in srgb, var(--gist-color-brand-accent-1, #2B62B5) 40%, white);
+.mp-bar-color-4 {
+  background-color: var(--gist-color-brand-accent-4);
 }
 .mp-text-color-0 {
   color: var(--gist-color-brand-accent-1);
@@ -123,18 +120,13 @@
   color: var(--gist-color-brand-accent-3);
 }
 .mp-text-color-3 {
-  color: #AAC0E1; /* Fallback (approx 40% accent mix) */
-  color: color-mix(in srgb, var(--gist-color-brand-accent-1, #2B62B5) 40%, white);
+  color: var(--gist-color-brand-accent-4);
 }
 
 
 /* Related Questions */
 .mp-related-box {
   margin-top: 80px;
-  padding: 35px;
-  background: #fdfdfd;
-  border: 1px solid #eee;
-  border-radius: 12px;
 }
 
 .mp-related-header {
@@ -155,7 +147,7 @@
 .mp-related-link {
   display: block;
   text-decoration: none;
-  color: var(--gist-color-brand-accent-1);
+  color: var(--gist-color-brand-accent-2);
   font-size: 1.1rem;
   padding: 16px 20px;
   background: #fff;
@@ -170,7 +162,7 @@
 }
 
 .mp-related-link:focus-visible {
-  outline: 2px solid var(--gist-color-brand-accent-2);
+  outline: 2px solid var(--gist-color-brand-accent-1);
   outline-offset: 2px;
 }
 
@@ -249,7 +241,7 @@
 .mp-source-title {
   display: -webkit-box;
   font-weight: bold;
-  color: #0073aa;
+  color: var(--gist-color-brand-accent-2);
   margin-bottom: 8px;
   line-height: 1.3;
   -webkit-line-clamp: 2;

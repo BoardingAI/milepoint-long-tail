@@ -35,7 +35,7 @@ $base_url     = get_post_type_archive_link('milepoint_qa') ?: home_url('/questio
 
 <div class="mp-hub-wrapper">
   <header class="mp-hub-header">
-    <h1 class="kt-adv-heading177_7f7566-76 wp-block-kadence-advancedheading has-theme-palette-3-color has-text-color" data-kb-block="kb-adv-heading177_7f7566-76"><mark style="background-color:rgba(0, 0, 0, 0)" class="has-inline-color has-theme-palette-1-color">#asked</mark> &amp; <mark style="background-color:rgba(0, 0, 0, 0)" class="has-inline-color has-theme-palette-1-color">#answered</mark> questions</h1>
+    <h1><span style="color: var(--global-palette1)">#asked</span> &amp; <span style="color: var(--global-palette1)">answered</span></h1>
   </header>
 
   <div class="mp-hub-layout">
