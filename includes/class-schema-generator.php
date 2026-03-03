@@ -155,7 +155,18 @@ class MP_Schema_Generator
         // --- Assemble Schema Graph ---
         $graph = [];
 
-        // 1. Publisher Node (Organization)
+        // 1. Publisher Logo Node (Standalone ImageObject)
+        $logo_id = home_url('/#logo');
+        if (!empty($publisherLogoUrl)) {
+            $graph[] = [
+                '@type' => 'ImageObject',
+                '@id'   => $logo_id,
+                'url'   => $publisherLogoUrl,
+                'inLanguage' => get_bloginfo('language')
+            ];
+        }
+
+        // 2. Publisher Node (Organization)
         $publisher_id = home_url('/#organization');
         $publisher_node = [
             '@type' => 'Organization',
@@ -164,15 +175,11 @@ class MP_Schema_Generator
             'url'   => home_url('/')
         ];
         if (!empty($publisherLogoUrl)) {
-            $publisher_node['logo'] = [
-                '@type' => 'ImageObject',
-                '@id'   => home_url('/#logo'),
-                'url'   => $publisherLogoUrl
-            ];
+            $publisher_node['logo'] = ['@id' => $logo_id]; // Pointer!
         }
         $graph[] = $publisher_node;
 
-        // 2. WebSite Node
+        // 3. WebSite Node
         $website_id = home_url('/#website');
         $graph[] = [
             '@type' => 'WebSite',
@@ -188,7 +195,18 @@ class MP_Schema_Generator
             ]
         ];
 
-        // 3. BreadcrumbList Node
+        // 4. Questions Archive Node
+        $archive_url = get_post_type_archive_link('milepoint_qa');
+        $archive_id = $archive_url . '#collection';
+        $graph[] = [
+            '@type' => 'CollectionPage',
+            '@id'   => $archive_id,
+            'url'   => $archive_url,
+            'name'  => 'Questions Archive',
+            'isPartOf' => ['@id' => $website_id]
+        ];
+
+        // 5. BreadcrumbList Node
         $breadcrumb_id = $url . '#breadcrumb';
         $graph[] = [
             '@type' => 'BreadcrumbList',
@@ -198,7 +216,7 @@ class MP_Schema_Generator
                     '@type' => 'ListItem',
                     'position' => 1,
                     'item' => [
-                        '@id' => home_url('/'),
+                        '@id' => $website_id,
                         'name' => 'Home'
                     ]
                 ],
@@ -206,7 +224,7 @@ class MP_Schema_Generator
                     '@type' => 'ListItem',
                     'position' => 2,
                     'item' => [
-                        '@id' => get_post_type_archive_link('milepoint_qa'),
+                        '@id' => $archive_id,
                         'name' => 'Questions'
                     ]
                 ],
@@ -221,7 +239,7 @@ class MP_Schema_Generator
             ]
         ];
 
-        // 4. Main DiscussionForumPosting ID
+        // 6. Main DiscussionForumPosting ID
         $posting_id = $url . '#posting';
 
         // 5. WebPage Node
