@@ -149,48 +149,93 @@ class MP_Schema_Generator
 
         $interactionCount = count($comments);
 
-        // --- Assemble Schema ---
-        $schema = [
-            '@context' => 'https://schema.org',
+        // --- Assemble Schema Graph ---
+        $graph = [];
+
+        // 1. Publisher Node
+        $publisher_id = home_url('/#organization');
+        $publisher_node = [
+            '@type' => 'Organization',
+            '@id'   => $publisher_id,
+            'name'  => $publisherName
+        ];
+        if (!empty($publisherLogoUrl)) {
+            $publisher_node['logo'] = [
+                '@type' => 'ImageObject',
+                'url'   => $publisherLogoUrl
+            ];
+        }
+        $graph[] = $publisher_node;
+
+        // 2. Author Node
+        $author_id = $url . '#author';
+        $graph[] = [
+            '@type' => 'Person',
+            '@id'   => $author_id,
+            'name'  => $authorName
+        ];
+
+        // 3. AI Assistant Node (only if AI answers exist, handled universally)
+        $ai_id = $url . '#ai-assistant';
+        $graph[] = [
+            '@type' => 'Person',
+            '@id'   => $ai_id,
+            'name'  => 'AI Assistant'
+        ];
+
+        // 4. Comment Nodes
+        $comment_refs = [];
+        foreach ($comments as $comment_data) {
+            // Determine the correct author reference for this comment
+            $comment_author_ref = ($comment_data['author']['name'] === 'AI Assistant') ? $ai_id : $author_id;
+
+            // Add the standalone comment node to the graph
+            $graph[] = [
+                '@type'         => 'Comment',
+                '@id'           => $comment_data['@id'],
+                'text'          => $comment_data['text'],
+                'datePublished' => $comment_data['datePublished'],
+                'url'           => $comment_data['url'],
+                'author'        => ['@id' => $comment_author_ref] // Pointer!
+            ];
+
+            // Save the pointer for the main DiscussionForumPosting
+            $comment_refs[] = ['@id' => $comment_data['@id']];
+        }
+
+        // 5. Main DiscussionForumPosting Node
+        $posting_node = [
             '@type' => 'DiscussionForumPosting',
-            '@id' => $url,
+            '@id'   => $url,
             'headline' => $headline,
             'text' => $mainQuestionText,
             'datePublished' => $datePublished,
             'dateModified' => $dateModified,
-            'author' => [
-                '@type' => 'Person',
-                '@id' => $url . '#author',
-                'name' => $authorName
-            ],
-            'publisher' => [
-                '@type' => 'Organization',
-                '@id' => home_url('/#organization'),
-                'name' => $publisherName
-            ],
+            'author' => ['@id' => $author_id], // Pointer!
+            'publisher' => ['@id' => $publisher_id], // Pointer!
             'mainEntityOfPage' => $url,
             'interactionStatistic' => [
                 '@type' => 'InteractionCounter',
                 'interactionType' => 'https://schema.org/CommentAction',
                 'userInteractionCount' => $interactionCount
             ],
-            'comment' => $comments
+            'comment' => $comment_refs // Array of Pointers!
         ];
 
         if (!empty($description)) {
-            $schema['description'] = $description;
+            $posting_node['description'] = $description;
         }
-
         if (!empty($imageUrl)) {
-            $schema['image'] = [$imageUrl];
+            $posting_node['image'] = [$imageUrl];
         }
 
-        if (!empty($publisherLogoUrl)) {
-            $schema['publisher']['logo'] = [
-                '@type' => 'ImageObject',
-                'url' => $publisherLogoUrl
-            ];
-        }
+        $graph[] = $posting_node;
+
+        // Final Output
+        $schema = [
+            '@context' => 'https://schema.org',
+            '@graph'   => $graph
+        ];
 
         // Output Schema
         echo '<script type="application/ld+json">' . json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) . '</script>' . "\n";
