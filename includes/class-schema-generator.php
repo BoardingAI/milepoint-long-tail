@@ -179,7 +179,13 @@ class MP_Schema_Generator
             '@id'   => $website_id,
             'url'   => home_url('/'),
             'name'  => $publisherName,
-            'publisher' => ['@id' => $publisher_id]
+            'publisher' => ['@id' => $publisher_id],
+            'inLanguage' => get_bloginfo('language'),
+            'potentialAction' => [
+                '@type' => 'SearchAction',
+                'target' => home_url('/?s={search_term_string}'),
+                'query-input' => 'required name=search_term_string'
+            ]
         ];
 
         // 3. BreadcrumbList Node
@@ -215,7 +221,10 @@ class MP_Schema_Generator
             ]
         ];
 
-        // 4. WebPage Node
+        // 4. Main DiscussionForumPosting ID
+        $posting_id = $url . '#posting';
+
+        // 5. WebPage Node
         $webpage_id = $url;
         $graph[] = [
             '@type' => 'WebPage',
@@ -224,11 +233,12 @@ class MP_Schema_Generator
             'name'  => $headline,
             'isPartOf' => ['@id' => $website_id],
             'breadcrumb' => ['@id' => $breadcrumb_id],
+            'mainEntity' => ['@id' => $posting_id],
             'datePublished' => $datePublished,
             'dateModified' => $dateModified
         ];
 
-        // 5. Author Node
+        // 6. Author Node
         $author_id = $url . '#author';
         $graph[] = [
             '@type' => 'Person',
@@ -236,15 +246,24 @@ class MP_Schema_Generator
             'name'  => $authorName
         ];
 
-        // 6. AI Assistant Node
+        // 7. AI Assistant Node (Conditional)
         $ai_id = $url . '#ai-assistant';
-        $graph[] = [
-            '@type' => 'Person',
-            '@id'   => $ai_id,
-            'name'  => 'AI Assistant'
-        ];
+        $has_ai_comment = false;
+        foreach ($comments as $comment_data) {
+            if ($comment_data['author']['name'] === 'AI Assistant') {
+                $has_ai_comment = true;
+                break;
+            }
+        }
+        if ($has_ai_comment) {
+            $graph[] = [
+                '@type' => 'Person',
+                '@id'   => $ai_id,
+                'name'  => 'AI Assistant'
+            ];
+        }
 
-        // 7. Comment Nodes
+        // 8. Comment Nodes
         $comment_refs = [];
         foreach ($comments as $comment_data) {
             $comment_author_ref = ($comment_data['author']['name'] === 'AI Assistant') ? $ai_id : $author_id;
@@ -262,8 +281,20 @@ class MP_Schema_Generator
             $comment_refs[] = ['@id' => $comment_data['@id']];
         }
 
-        // 8. Main DiscussionForumPosting Node
-        $posting_id = $url . '#posting';
+        // 9. ImageObject Node
+        $image_ref = null;
+        if (!empty($imageUrl)) {
+            $image_id = $url . '#primaryimage';
+            $graph[] = [
+                '@type'      => 'ImageObject',
+                '@id'        => $image_id,
+                'inLanguage' => get_bloginfo('language'),
+                'url'        => $imageUrl
+            ];
+            $image_ref = ['@id' => $image_id];
+        }
+
+        // 10. Main DiscussionForumPosting Node
         $posting_node = [
             '@type' => 'DiscussionForumPosting',
             '@id'   => $posting_id,
@@ -285,8 +316,8 @@ class MP_Schema_Generator
         if (!empty($description)) {
             $posting_node['description'] = $description;
         }
-        if (!empty($imageUrl)) {
-            $posting_node['image'] = [$imageUrl];
+        if ($image_ref) {
+            $posting_node['image'] = $image_ref;
         }
 
         $graph[] = $posting_node;
