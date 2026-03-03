@@ -98,6 +98,7 @@ class MP_Schema_Generator
             $comments[] = [
                 '@type' => 'Comment',
                 '@id' => $url . '#comment-a-0',
+                'name' => 'Answer 1',
                 'text' => $this->to_plain_text($firstItem['answer']),
                 'datePublished' => $datePublished,
                 'url' => $url . '#mp-a-0',
@@ -119,6 +120,7 @@ class MP_Schema_Generator
                 $comments[] = [
                     '@type' => 'Comment',
                     '@id' => $url . '#comment-q-' . $i,
+                    'name' => 'Follow-up Question ' . $i,
                     'text' => $this->to_plain_text($item['question']),
                     'datePublished' => $datePublished,
                     'url' => $url . '#mp-q-' . $i,
@@ -135,6 +137,7 @@ class MP_Schema_Generator
                 $comments[] = [
                     '@type' => 'Comment',
                     '@id' => $url . '#comment-a-' . $i,
+                    'name' => 'Answer ' . ($i + 1),
                     'text' => $this->to_plain_text($item['answer']),
                     'datePublished' => $datePublished,
                     'url' => $url . '#mp-a-' . $i,
@@ -157,7 +160,8 @@ class MP_Schema_Generator
         $publisher_node = [
             '@type' => 'Organization',
             '@id'   => $publisher_id,
-            'name'  => $publisherName
+            'name'  => $publisherName,
+            'url'   => home_url('/')
         ];
         if (!empty($publisherLogoUrl)) {
             $publisher_node['logo'] = [
@@ -193,6 +197,7 @@ class MP_Schema_Generator
             $graph[] = [
                 '@type'         => 'Comment',
                 '@id'           => $comment_data['@id'],
+                'name'          => $comment_data['name'],
                 'text'          => $comment_data['text'],
                 'datePublished' => $comment_data['datePublished'],
                 'url'           => $comment_data['url'],
