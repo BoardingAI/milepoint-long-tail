@@ -155,7 +155,7 @@ class MP_Schema_Generator
         // --- Assemble Schema Graph ---
         $graph = [];
 
-        // 1. Publisher Node
+        // 1. Publisher Node (Organization)
         $publisher_id = home_url('/#organization');
         $publisher_node = [
             '@type' => 'Organization',
@@ -166,12 +166,69 @@ class MP_Schema_Generator
         if (!empty($publisherLogoUrl)) {
             $publisher_node['logo'] = [
                 '@type' => 'ImageObject',
+                '@id'   => home_url('/#logo'),
                 'url'   => $publisherLogoUrl
             ];
         }
         $graph[] = $publisher_node;
 
-        // 2. Author Node
+        // 2. WebSite Node
+        $website_id = home_url('/#website');
+        $graph[] = [
+            '@type' => 'WebSite',
+            '@id'   => $website_id,
+            'url'   => home_url('/'),
+            'name'  => $publisherName,
+            'publisher' => ['@id' => $publisher_id]
+        ];
+
+        // 3. BreadcrumbList Node
+        $breadcrumb_id = $url . '#breadcrumb';
+        $graph[] = [
+            '@type' => 'BreadcrumbList',
+            '@id'   => $breadcrumb_id,
+            'itemListElement' => [
+                [
+                    '@type' => 'ListItem',
+                    'position' => 1,
+                    'item' => [
+                        '@id' => home_url('/'),
+                        'name' => 'Home'
+                    ]
+                ],
+                [
+                    '@type' => 'ListItem',
+                    'position' => 2,
+                    'item' => [
+                        '@id' => get_post_type_archive_link('milepoint_qa'),
+                        'name' => 'Questions'
+                    ]
+                ],
+                [
+                    '@type' => 'ListItem',
+                    'position' => 3,
+                    'item' => [
+                        '@id' => $url,
+                        'name' => $headline
+                    ]
+                ]
+            ]
+        ];
+
+        // 4. WebPage Node
+        $webpage_id = $url;
+        $graph[] = [
+            '@type' => 'WebPage',
+            '@id'   => $webpage_id,
+            'url'   => $url,
+            'name'  => $headline,
+            'isPartOf' => ['@id' => $website_id],
+            'breadcrumb' => ['@id' => $breadcrumb_id],
+            'datePublished' => $datePublished,
+            'dateModified' => $dateModified
+        ];
+
+        // 5. Author Node
         $author_id = $url . '#author';
         $graph[] = [
             '@type' => 'Person',
@@ -179,7 +236,7 @@ class MP_Schema_Generator
             'name'  => $authorName
         ];
 
-        // 3. AI Assistant Node (only if AI answers exist, handled universally)
+        // 6. AI Assistant Node
         $ai_id = $url . '#ai-assistant';
         $graph[] = [
             '@type' => 'Person',
@@ -187,13 +244,11 @@ class MP_Schema_Generator
             'name'  => 'AI Assistant'
         ];
 
-        // 4. Comment Nodes
+        // 7. Comment Nodes
         $comment_refs = [];
         foreach ($comments as $comment_data) {
-            // Determine the correct author reference for this comment
             $comment_author_ref = ($comment_data['author']['name'] === 'AI Assistant') ? $ai_id : $author_id;
 
-            // Add the standalone comment node to the graph
             $graph[] = [
                 '@type'         => 'Comment',
                 '@id'           => $comment_data['@id'],
@@ -201,30 +256,30 @@ class MP_Schema_Generator
                 'text'          => $comment_data['text'],
                 'datePublished' => $comment_data['datePublished'],
                 'url'           => $comment_data['url'],
-                'author'        => ['@id' => $comment_author_ref] // Pointer!
+                'author'        => ['@id' => $comment_author_ref]
             ];
 
-            // Save the pointer for the main DiscussionForumPosting
             $comment_refs[] = ['@id' => $comment_data['@id']];
         }
 
-        // 5. Main DiscussionForumPosting Node
+        // 8. Main DiscussionForumPosting Node
+        $posting_id = $url . '#posting';
         $posting_node = [
             '@type' => 'DiscussionForumPosting',
-            '@id'   => $url,
+            '@id'   => $posting_id,
             'headline' => $headline,
             'text' => $mainQuestionText,
             'datePublished' => $datePublished,
             'dateModified' => $dateModified,
-            'author' => ['@id' => $author_id], // Pointer!
-            'publisher' => ['@id' => $publisher_id], // Pointer!
-            'mainEntityOfPage' => $url,
+            'author' => ['@id' => $author_id],
+            'publisher' => ['@id' => $publisher_id],
+            'mainEntityOfPage' => ['@id' => $webpage_id],
             'interactionStatistic' => [
                 '@type' => 'InteractionCounter',
                 'interactionType' => 'https://schema.org/CommentAction',
                 'userInteractionCount' => $interactionCount
             ],
-            'comment' => $comment_refs // Array of Pointers!
+            'comment' => $comment_refs
         ];
 
         if (!empty($description)) {
