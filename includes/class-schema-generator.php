@@ -97,11 +97,13 @@ class MP_Schema_Generator
         if (!empty($firstItem['answer'])) {
             $comments[] = [
                 '@type' => 'Comment',
+                '@id' => $url . '#comment-a-0',
                 'text' => $this->to_plain_text($firstItem['answer']),
                 'datePublished' => $datePublished,
                 'url' => $url . '#mp-a-0',
                 'author' => [
                     '@type' => 'Person',
+                    '@id' => $url . '#ai-assistant',
                     'name' => 'AI Assistant'
                 ]
             ];
@@ -116,11 +118,13 @@ class MP_Schema_Generator
             if (!empty($item['question'])) {
                 $comments[] = [
                     '@type' => 'Comment',
+                    '@id' => $url . '#comment-q-' . $i,
                     'text' => $this->to_plain_text($item['question']),
                     'datePublished' => $datePublished,
                     'url' => $url . '#mp-q-' . $i,
                     'author' => [
                         '@type' => 'Person',
+                        '@id' => $url . '#author',
                         'name' => 'Guest'
                     ]
                 ];
@@ -130,11 +134,13 @@ class MP_Schema_Generator
             if (!empty($item['answer'])) {
                 $comments[] = [
                     '@type' => 'Comment',
+                    '@id' => $url . '#comment-a-' . $i,
                     'text' => $this->to_plain_text($item['answer']),
                     'datePublished' => $datePublished,
                     'url' => $url . '#mp-a-' . $i,
                     'author' => [
                         '@type' => 'Person',
+                        '@id' => $url . '#ai-assistant',
                         'name' => 'AI Assistant'
                     ]
                 ];
@@ -154,10 +160,12 @@ class MP_Schema_Generator
             'dateModified' => $dateModified,
             'author' => [
                 '@type' => 'Person',
+                '@id' => $url . '#author',
                 'name' => $authorName
             ],
             'publisher' => [
                 '@type' => 'Organization',
+                '@id' => home_url('/#organization'),
                 'name' => $publisherName
             ],
             'mainEntityOfPage' => $url,
