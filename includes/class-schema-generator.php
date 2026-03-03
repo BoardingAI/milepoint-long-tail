@@ -159,10 +159,7 @@ class MP_Schema_Generator
                 '@type' => 'Organization',
                 'name' => $publisherName
             ],
-            'mainEntityOfPage' => [
-                '@type' => 'WebPage',
-                '@id' => $url
-            ],
+            'mainEntityOfPage' => $url,
             'interactionStatistic' => [
                 '@type' => 'InteractionCounter',
                 'interactionType' => 'https://schema.org/CommentAction',
