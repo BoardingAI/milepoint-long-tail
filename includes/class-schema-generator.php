@@ -147,6 +147,7 @@ class MP_Schema_Generator
         $schema = [
             '@context' => 'https://schema.org',
             '@type' => 'DiscussionForumPosting',
+            '@id' => $url,
             'headline' => $headline,
             'text' => $mainQuestionText,
             'datePublished' => $datePublished,
