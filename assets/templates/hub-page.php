@@ -74,7 +74,7 @@ $base_url     = get_post_type_archive_link('milepoint_qa') ?: home_url('/questio
           ?>
             <a href="<?php echo esc_url($link); ?>" class="mp-facet-link <?php echo $is_active ? 'active' : ''; ?>">
               <?php echo esc_html($cat->name); ?>
-              <span class="mp-count"><?php echo isset($cat->formatted_post_count) ? $cat->formatted_post_count : $cat->post_count; ?></span>
+              <span class="mp-count"><?php echo esc_html($cat->formatted_post_count ?? $cat->post_count); ?></span>
             </a>
           <?php endforeach; ?>
         </div>
@@ -94,7 +94,7 @@ $base_url     = get_post_type_archive_link('milepoint_qa') ?: home_url('/questio
           ?>
             <a href="<?php echo esc_url($link); ?>" class="mp-facet-link <?php echo $is_active ? 'active' : ''; ?>">
               <span class="mp-tag-name">#<?php echo esc_html($tag->name); ?></span>
-              <span class="mp-count"><?php echo isset($tag->formatted_post_count) ? $tag->formatted_post_count : $tag->post_count; ?></span>
+              <span class="mp-count"><?php echo esc_html($tag->formatted_post_count ?? $tag->post_count); ?></span>
             </a>
           <?php endforeach; ?>
         </div>
