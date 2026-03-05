@@ -146,8 +146,8 @@ function mp_get_boosted_count($count, $term_id) {
 
     // Add a smaller pseudo-random factor using term_id so it doesn't look too perfect
     // Ensure the random factor is small enough not to overtake the next highest post count
-    // Let's use term_id * 13 % 1000
-    $random_factor = ($term_id * 13) % 1000;
+    // Using a large prime multiplier (431) to drastically scatter sequential term IDs across the 0-999 range
+    $random_factor = ($term_id * 431) % 1000;
 
     return $base_boost + $random_factor;
 }
