@@ -123,5 +123,99 @@ function get_mp_terms_with_counts($taxonomy, $hide_empty = true)
     $wpdb->prepare($query, $taxonomy)
   );
 
+  $is_frontend = !is_admin() || wp_doing_ajax();
+  if (get_option('mp_cold_start_enabled') && $is_frontend) {
+    foreach ($results as $key => $term) {
+      $new_term = clone $term;
+      $new_term->real_post_count = $new_term->post_count;
+      $boosted_int = mp_get_boosted_count($new_term->post_count, $new_term->term_id);
+      $new_term->post_count = mp_format_number_abbreviated($boosted_int);
+      $results[$key] = $new_term;
+    }
+  }
+
   return $results;
+}
+
+function mp_get_boosted_count($count, $term_id) {
+    if (!$count) return 0;
+
+    // Pseudo-random deterministic boost based on term_id
+    // Ensure the base relationship (highest counts stay highest) by multiplying
+    $base_boost = $count * 1500;
+
+    // Add a smaller pseudo-random factor using term_id so it doesn't look too perfect
+    // Ensure the random factor is small enough not to overtake the next highest post count
+    // Using a large prime multiplier (431) to drastically scatter sequential term IDs across the 0-999 range
+    $random_factor = ($term_id * 431) % 1000;
+
+    return $base_boost + $random_factor;
+}
+
+// Hook into get_terms to globally apply the cold start boost on the frontend
+add_filter('get_terms', 'mp_apply_cold_start_boost_to_terms', 10, 4);
+function mp_apply_cold_start_boost_to_terms($terms, $taxonomies, $args, $term_query) {
+    $is_frontend = !is_admin() || wp_doing_ajax();
+    if (get_option('mp_cold_start_enabled') && $is_frontend && is_array($terms)) {
+        foreach ($terms as $key => $term) {
+            if (is_object($term) && isset($term->count) && $term->count > 0) {
+                $new_term = clone $term;
+                // We use a separate property to store the real count if needed elsewhere
+                $new_term->real_count = $new_term->count;
+                $new_term->count = mp_get_boosted_count($new_term->count, $new_term->term_id);
+                // Assign the formatted count to a custom property so frontend templates can use it
+                $new_term->formatted_boosted_count = mp_format_number_abbreviated($new_term->count);
+                $terms[$key] = $new_term;
+            }
+        }
+    }
+    return $terms;
+}
+
+// Hook into single term retrieval to globally apply the cold start boost
+add_filter('get_term', 'mp_apply_cold_start_boost_to_single_term', 10, 2);
+function mp_apply_cold_start_boost_to_single_term($term, $taxonomy) {
+    $is_frontend = !is_admin() || wp_doing_ajax();
+    if (get_option('mp_cold_start_enabled') && $is_frontend && is_object($term) && isset($term->count) && $term->count > 0) {
+        $new_term = clone $term;
+        $new_term->real_count = $new_term->count;
+        $new_term->count = mp_get_boosted_count($new_term->count, $new_term->term_id);
+        $new_term->formatted_boosted_count = mp_format_number_abbreviated($new_term->count);
+        return $new_term;
+    }
+    return $term;
+}
+
+// Format counts in standard wp_list_categories output without breaking float casting
+add_filter('wp_list_categories', 'mp_format_category_counts_html', 10, 2);
+function mp_format_category_counts_html($output, $args) {
+    $is_frontend = !is_admin() || wp_doing_ajax();
+    if (get_option('mp_cold_start_enabled') && $is_frontend && !empty($args['show_count'])) {
+        // wp_list_categories outputs counts either wrapped in <span class="count">(1,234)</span> or just &nbsp;(1,234)
+        $output = preg_replace_callback('/<span class="count">\(([0-9,]+)\)<\/span>/', function($matches) {
+            $num = (int) str_replace(',', '', $matches[1]);
+            return '<span class="count">(' . mp_format_number_abbreviated($num) . ')</span>';
+        }, $output);
+
+        $output = preg_replace_callback('/&nbsp;\(([0-9,]+)\)/', function($matches) {
+            $num = (int) str_replace(',', '', $matches[1]);
+            return '&nbsp;(' . mp_format_number_abbreviated($num) . ')';
+        }, $output);
+    }
+    return $output;
+}
+
+function mp_format_number_abbreviated($number) {
+    if ($number < 1000) {
+        return $number;
+    }
+
+    if ($number < 1000000) {
+        $formatted = number_format($number / 1000, 1);
+        // Remove .0 if it exists
+        return str_replace('.0', '', $formatted) . 'K';
+    }
+
+    $formatted = number_format($number / 1000000, 1);
+    return str_replace('.0', '', $formatted) . 'M';
 }

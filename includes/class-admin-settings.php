@@ -26,6 +26,10 @@ class MP_QA_Settings
     register_setting("mp_qa_settings_group", "mp_openai_api_key", [
       "sanitize_callback" => "sanitize_text_field",
     ]);
+    register_setting("mp_qa_settings_group", "mp_cold_start_enabled", [
+      "type" => "boolean",
+      "sanitize_callback" => "rest_sanitize_boolean",
+    ]);
   }
 
   public function enqueue_admin_assets($hook)
@@ -49,7 +53,8 @@ class MP_QA_Settings
 
   public function render_settings_page()
   {
-    $key = get_option("mp_openai_api_key"); ?>
+    $key = get_option("mp_openai_api_key");
+    $cold_start_enabled = get_option("mp_cold_start_enabled"); ?>
         <div class="wrap">
             <h1>Milepoint Q&A Settings</h1>
             <form method="post" action="options.php">
@@ -77,6 +82,22 @@ class MP_QA_Settings
                                 </button>
                             </div>
                             <p class="description">Enter your OpenAI <code>sk-...</code> key here.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="mp_cold_start_enabled">Enable Cold Start Counts</label></th>
+                        <td>
+                            <label>
+                                <input type="hidden" name="mp_cold_start_enabled" value="0">
+                                <input
+                                    type="checkbox"
+                                    id="mp_cold_start_enabled"
+                                    name="mp_cold_start_enabled"
+                                    value="1"
+                                    <?php checked(1, $cold_start_enabled, true); ?>
+                                >
+                                Artificially boost category and tag counts on the frontend.
+                            </label>
                         </td>
                     </tr>
                 </table>
