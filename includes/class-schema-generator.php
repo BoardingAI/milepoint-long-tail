@@ -97,11 +97,14 @@ class MP_Schema_Generator
         if (!empty($firstItem['answer'])) {
             $comments[] = [
                 '@type' => 'Comment',
+                '@id' => $url . '#comment-a-0',
+                'name' => 'Answer 1',
                 'text' => $this->to_plain_text($firstItem['answer']),
                 'datePublished' => $datePublished,
                 'url' => $url . '#mp-a-0',
                 'author' => [
                     '@type' => 'Person',
+                    '@id' => $url . '#ai-assistant',
                     'name' => 'AI Assistant'
                 ]
             ];
@@ -116,11 +119,14 @@ class MP_Schema_Generator
             if (!empty($item['question'])) {
                 $comments[] = [
                     '@type' => 'Comment',
+                    '@id' => $url . '#comment-q-' . $i,
+                    'name' => 'Follow-up Question ' . $i,
                     'text' => $this->to_plain_text($item['question']),
                     'datePublished' => $datePublished,
                     'url' => $url . '#mp-q-' . $i,
                     'author' => [
                         '@type' => 'Person',
+                        '@id' => $url . '#author',
                         'name' => 'Guest'
                     ]
                 ];
@@ -130,11 +136,14 @@ class MP_Schema_Generator
             if (!empty($item['answer'])) {
                 $comments[] = [
                     '@type' => 'Comment',
+                    '@id' => $url . '#comment-a-' . $i,
+                    'name' => 'Answer ' . ($i + 1),
                     'text' => $this->to_plain_text($item['answer']),
                     'datePublished' => $datePublished,
                     'url' => $url . '#mp-a-' . $i,
                     'author' => [
                         '@type' => 'Person',
+                        '@id' => $url . '#ai-assistant',
                         'name' => 'AI Assistant'
                     ]
                 ];
@@ -143,48 +152,199 @@ class MP_Schema_Generator
 
         $interactionCount = count($comments);
 
-        // --- Assemble Schema ---
-        $schema = [
-            '@context' => 'https://schema.org',
+        // --- Assemble Schema Graph ---
+        $graph = [];
+
+        // 1. Publisher Logo Node (Standalone ImageObject)
+        $logo_id = home_url('/#logo');
+        if (!empty($publisherLogoUrl)) {
+            $graph[] = [
+                '@type' => 'ImageObject',
+                '@id'   => $logo_id,
+                'url'   => $publisherLogoUrl,
+                'inLanguage' => get_bloginfo('language')
+            ];
+        }
+
+        // 2. Publisher Node (Organization)
+        $publisher_id = home_url('/#organization');
+        $publisher_node = [
+            '@type' => 'Organization',
+            '@id'   => $publisher_id,
+            'name'  => $publisherName,
+            'url'   => home_url('/')
+        ];
+        if (!empty($publisherLogoUrl)) {
+            $publisher_node['logo'] = ['@id' => $logo_id]; // Pointer!
+        }
+        $graph[] = $publisher_node;
+
+        // 3. WebSite Node
+        $website_id = home_url('/#website');
+        $graph[] = [
+            '@type' => 'WebSite',
+            '@id'   => $website_id,
+            'url'   => home_url('/'),
+            'name'  => $publisherName,
+            'publisher' => ['@id' => $publisher_id],
+            'inLanguage' => get_bloginfo('language'),
+            'potentialAction' => [
+                '@type' => 'SearchAction',
+                'target' => home_url('/?s={search_term_string}'),
+                'query-input' => 'required name=search_term_string'
+            ]
+        ];
+
+        // 4. Questions Archive Node
+        $archive_url = get_post_type_archive_link('milepoint_qa');
+        $archive_id = $archive_url . '#collection';
+        $graph[] = [
+            '@type' => 'CollectionPage',
+            '@id'   => $archive_id,
+            'url'   => $archive_url,
+            'name'  => 'Questions Archive',
+            'isPartOf' => ['@id' => $website_id]
+        ];
+
+        // 5. BreadcrumbList Node
+        $breadcrumb_id = $url . '#breadcrumb';
+        $graph[] = [
+            '@type' => 'BreadcrumbList',
+            '@id'   => $breadcrumb_id,
+            'itemListElement' => [
+                [
+                    '@type' => 'ListItem',
+                    'position' => 1,
+                    'item' => [
+                        '@id' => $website_id,
+                        'name' => 'Home'
+                    ]
+                ],
+                [
+                    '@type' => 'ListItem',
+                    'position' => 2,
+                    'item' => [
+                        '@id' => $archive_id,
+                        'name' => 'Questions'
+                    ]
+                ],
+                [
+                    '@type' => 'ListItem',
+                    'position' => 3,
+                    'item' => [
+                        '@id' => $url,
+                        'name' => $headline
+                    ]
+                ]
+            ]
+        ];
+
+        // 6. Main DiscussionForumPosting ID
+        $posting_id = $url . '#posting';
+
+        // 5. WebPage Node
+        $webpage_id = $url;
+        $graph[] = [
+            '@type' => 'WebPage',
+            '@id'   => $webpage_id,
+            'url'   => $url,
+            'name'  => $headline,
+            'isPartOf' => ['@id' => $website_id],
+            'breadcrumb' => ['@id' => $breadcrumb_id],
+            'mainEntity' => ['@id' => $posting_id],
+            'datePublished' => $datePublished,
+            'dateModified' => $dateModified
+        ];
+
+        // 6. Author Node
+        $author_id = $url . '#author';
+        $graph[] = [
+            '@type' => 'Person',
+            '@id'   => $author_id,
+            'name'  => $authorName
+        ];
+
+        // 7. AI Assistant Node (Conditional)
+        $ai_id = $url . '#ai-assistant';
+        $has_ai_comment = false;
+        foreach ($comments as $comment_data) {
+            if ($comment_data['author']['name'] === 'AI Assistant') {
+                $has_ai_comment = true;
+                break;
+            }
+        }
+        if ($has_ai_comment) {
+            $graph[] = [
+                '@type' => 'Person',
+                '@id'   => $ai_id,
+                'name'  => 'AI Assistant'
+            ];
+        }
+
+        // 8. Comment Nodes
+        $comment_refs = [];
+        foreach ($comments as $comment_data) {
+            $comment_author_ref = ($comment_data['author']['name'] === 'AI Assistant') ? $ai_id : $author_id;
+
+            $graph[] = [
+                '@type'         => 'Comment',
+                '@id'           => $comment_data['@id'],
+                'name'          => $comment_data['name'],
+                'text'          => $comment_data['text'],
+                'datePublished' => $comment_data['datePublished'],
+                'url'           => $comment_data['url'],
+                'author'        => ['@id' => $comment_author_ref]
+            ];
+
+            $comment_refs[] = ['@id' => $comment_data['@id']];
+        }
+
+        // 9. ImageObject Node
+        $image_ref = null;
+        if (!empty($imageUrl)) {
+            $image_id = $url . '#primaryimage';
+            $graph[] = [
+                '@type'      => 'ImageObject',
+                '@id'        => $image_id,
+                'inLanguage' => get_bloginfo('language'),
+                'url'        => $imageUrl
+            ];
+            $image_ref = ['@id' => $image_id];
+        }
+
+        // 10. Main DiscussionForumPosting Node
+        $posting_node = [
             '@type' => 'DiscussionForumPosting',
+            '@id'   => $posting_id,
             'headline' => $headline,
             'text' => $mainQuestionText,
             'datePublished' => $datePublished,
             'dateModified' => $dateModified,
-            'author' => [
-                '@type' => 'Person',
-                'name' => $authorName
-            ],
-            'publisher' => [
-                '@type' => 'Organization',
-                'name' => $publisherName
-            ],
-            'mainEntityOfPage' => [
-                '@type' => 'WebPage',
-                '@id' => $url
-            ],
+            'author' => ['@id' => $author_id],
+            'publisher' => ['@id' => $publisher_id],
+            'mainEntityOfPage' => ['@id' => $webpage_id],
             'interactionStatistic' => [
                 '@type' => 'InteractionCounter',
                 'interactionType' => 'https://schema.org/CommentAction',
                 'userInteractionCount' => $interactionCount
             ],
-            'comment' => $comments
+            'comment' => $comment_refs
         ];
 
         if (!empty($description)) {
-            $schema['description'] = $description;
+            $posting_node['description'] = $description;
+        }
+        if ($image_ref) {
+            $posting_node['image'] = $image_ref;
         }
 
-        if (!empty($imageUrl)) {
-            $schema['image'] = [$imageUrl];
-        }
+        $graph[] = $posting_node;
 
-        if (!empty($publisherLogoUrl)) {
-            $schema['publisher']['logo'] = [
-                '@type' => 'ImageObject',
-                'url' => $publisherLogoUrl
-            ];
-        }
+        // Final Output
+        $schema = [
+            '@context' => 'https://schema.org',
+            '@graph'   => $graph
+        ];
 
         // Output Schema
         echo '<script type="application/ld+json">' . json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) . '</script>' . "\n";
