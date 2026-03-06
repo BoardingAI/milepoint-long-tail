@@ -152,6 +152,9 @@ function get_mp_terms_with_counts($taxonomy, $hide_empty = true)
     }
 
     usort($results, function($a, $b) {
+      if ($a->post_count === $b->post_count) {
+          return strcmp($a->name, $b->name);
+      }
       return $b->post_count <=> $a->post_count;
     });
   }
@@ -277,11 +280,18 @@ function mp_apply_cold_start_boost_to_terms($terms, $taxonomies, $args, $term_qu
             }
         }
 
-        usort($terms, function($a, $b) {
-            $count_a = is_object($a) && isset($a->count) ? (int)$a->count : 0;
-            $count_b = is_object($b) && isset($b->count) ? (int)$b->count : 0;
-            return $count_b <=> $count_a;
-        });
+        if (isset($args['orderby']) && $args['orderby'] === 'count') {
+            usort($terms, function($a, $b) {
+                $count_a = is_object($a) && isset($a->count) ? (int)$a->count : 0;
+                $count_b = is_object($b) && isset($b->count) ? (int)$b->count : 0;
+                if ($count_a === $count_b) {
+                    $id_a = is_object($a) && isset($a->term_id) ? (int)$a->term_id : 0;
+                    $id_b = is_object($b) && isset($b->term_id) ? (int)$b->term_id : 0;
+                    return $id_a <=> $id_b;
+                }
+                return $count_b <=> $count_a;
+            });
+        }
     }
     return $terms;
 }
