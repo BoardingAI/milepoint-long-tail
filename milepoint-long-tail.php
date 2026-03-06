@@ -125,16 +125,88 @@ function get_mp_terms_with_counts($taxonomy, $hide_empty = true)
 
   if (mp_should_apply_cold_start()) {
     foreach ($results as $key => $term) {
+      $true_count = (int)$term->post_count;
+      if ($true_count === 0) {
+        // If true count is 0, keep it unboosted per requirements
+        $new_term = clone $term;
+        $new_term->real_post_count = 0;
+        $new_term->post_count = 0;
+        $new_term->formatted_post_count = '0';
+        $results[$key] = $new_term;
+        continue;
+      }
+
       $new_term = clone $term;
-      $new_term->real_post_count = $new_term->post_count;
-      $boosted_int = mp_get_boosted_count($new_term->post_count, $new_term->term_id);
-      $new_term->post_count = $boosted_int;
-      $new_term->formatted_post_count = mp_format_number_abbreviated($boosted_int);
+      $new_term->real_post_count = $true_count;
+      $boosted_int = mp_get_boosted_count($true_count, $new_term->term_id);
+
+      if ($boosted_int > 0) {
+          $new_term->post_count = $boosted_int;
+          $new_term->formatted_post_count = mp_format_number_abbreviated($boosted_int);
+      } else {
+          $new_term->post_count = 0;
+          $new_term->formatted_post_count = '0';
+      }
+
       $results[$key] = $new_term;
     }
   }
 
   return $results;
+}
+
+function mp_get_global_rank_data() {
+    static $rank_map = null;
+
+    if ($rank_map !== null) {
+        return $rank_map;
+    }
+
+    global $wpdb;
+
+    // Run ONE optimized $wpdb query that fetches term_id and the published milepoint_qa count
+    // for all terms where that count is > 0.
+    $query = "
+        SELECT t.term_id, COUNT(p.ID) as true_count
+        FROM {$wpdb->terms} t
+        INNER JOIN {$wpdb->term_taxonomy} tt ON t.term_id = tt.term_id
+        INNER JOIN {$wpdb->term_relationships} tr ON tt.term_taxonomy_id = tr.term_taxonomy_id
+        INNER JOIN {$wpdb->posts} p ON tr.object_id = p.ID
+        WHERE p.post_type = 'milepoint_qa'
+        AND p.post_status = 'publish'
+        GROUP BY t.term_id
+        HAVING true_count > 0
+    ";
+
+    $results = $wpdb->get_results($query, ARRAY_A);
+
+    if (empty($results)) {
+        $rank_map = [
+            'total_terms' => 0,
+            'ranks' => []
+        ];
+        return $rank_map;
+    }
+
+    // Sort in PHP memory: true_count DESC, term_id ASC
+    usort($results, function($a, $b) {
+        if ((int)$a['true_count'] === (int)$b['true_count']) {
+            return (int)$a['term_id'] <=> (int)$b['term_id'];
+        }
+        return (int)$b['true_count'] <=> (int)$a['true_count'];
+    });
+
+    $ranks = [];
+    foreach ($results as $index => $row) {
+        $ranks[$row['term_id']] = $index + 1; // Rank is 1-based index
+    }
+
+    $rank_map = [
+        'total_terms' => count($results),
+        'ranks' => $ranks
+    ];
+
+    return $rank_map;
 }
 
 function mp_should_apply_cold_start() {
@@ -150,16 +222,31 @@ function mp_should_apply_cold_start() {
 function mp_get_boosted_count($count, $term_id) {
     if (!$count) return 0;
 
-    // Pseudo-random deterministic boost based on term_id
-    // Ensure the base relationship (highest counts stay highest) by multiplying
-    $base_boost = $count * 1500;
+    $global_data = mp_get_global_rank_data();
 
-    // Add a smaller pseudo-random factor using term_id so it doesn't look too perfect
-    // Ensure the random factor is small enough not to overtake the next highest post count
-    // Using a large prime multiplier (431) to drastically scatter sequential term IDs across the 0-999 range
-    $random_factor = ($term_id * 431) % 1000;
+    // If the term is not in the ranks (true count is 0), return 0 early.
+    // However, if $count passed in is > 0 but not in rank, that means it's a new or uncounted term.
+    // In strict case, true_count = 0 means exclude.
+    if (!isset($global_data['ranks'][$term_id])) {
+        return 0; // Term is completely excluded if not in global rank (meaning true_count == 0)
+    }
 
-    return $base_boost + $random_factor;
+    $rank = $global_data['ranks'][$term_id];
+    $total_terms = $global_data['total_terms'];
+
+    $config = [
+        'Scalar' => 50,
+        'Jitter_Range' => 500,
+        'Buffer' => 1
+    ];
+
+    $base_offset = ($total_terms - $rank) * ($config['Jitter_Range'] + $config['Buffer']);
+    $jitter = $term_id % $config['Jitter_Range'];
+
+    // Final Display = ((Base Offset + Jitter) * Scalar) + True_Count
+    $final_display = (($base_offset + $jitter) * $config['Scalar']) + $count;
+
+    return (int)$final_display;
 }
 
 // Hook into get_terms to globally apply the cold start boost on the frontend
@@ -169,11 +256,19 @@ function mp_apply_cold_start_boost_to_terms($terms, $taxonomies, $args, $term_qu
         foreach ($terms as $key => $term) {
             if (is_object($term) && isset($term->count) && $term->count > 0) {
                 $new_term = clone $term;
-                // We use a separate property to store the real count if needed elsewhere
-                $new_term->real_count = $new_term->count;
-                $new_term->count = mp_get_boosted_count($new_term->count, $new_term->term_id);
-                // Assign the formatted count to a custom property so frontend templates can use it
-                $new_term->formatted_boosted_count = mp_format_number_abbreviated($new_term->count);
+                $true_count = (int)$new_term->count;
+                $new_term->real_count = $true_count;
+
+                $boosted_int = mp_get_boosted_count($true_count, $new_term->term_id);
+
+                if ($boosted_int > 0) {
+                    $new_term->count = $boosted_int;
+                    $new_term->formatted_boosted_count = mp_format_number_abbreviated($boosted_int);
+                } else {
+                    $new_term->count = 0;
+                    $new_term->formatted_boosted_count = '0';
+                }
+
                 $terms[$key] = $new_term;
             }
         }
@@ -186,9 +281,19 @@ add_filter('get_term', 'mp_apply_cold_start_boost_to_single_term', 10, 2);
 function mp_apply_cold_start_boost_to_single_term($term, $taxonomy) {
     if (mp_should_apply_cold_start() && is_object($term) && isset($term->count) && $term->count > 0) {
         $new_term = clone $term;
-        $new_term->real_count = $new_term->count;
-        $new_term->count = mp_get_boosted_count($new_term->count, $new_term->term_id);
-        $new_term->formatted_boosted_count = mp_format_number_abbreviated($new_term->count);
+        $true_count = (int)$new_term->count;
+        $new_term->real_count = $true_count;
+
+        $boosted_int = mp_get_boosted_count($true_count, $new_term->term_id);
+
+        if ($boosted_int > 0) {
+            $new_term->count = $boosted_int;
+            $new_term->formatted_boosted_count = mp_format_number_abbreviated($boosted_int);
+        } else {
+            $new_term->count = 0;
+            $new_term->formatted_boosted_count = '0';
+        }
+
         return $new_term;
     }
     return $term;
