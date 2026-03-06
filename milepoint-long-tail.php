@@ -123,18 +123,28 @@ function get_mp_terms_with_counts($taxonomy, $hide_empty = true)
     $wpdb->prepare($query, $taxonomy)
   );
 
-  $is_frontend = !is_admin() || wp_doing_ajax();
-  if (get_option('mp_cold_start_enabled') && $is_frontend) {
+  if (mp_should_apply_cold_start()) {
     foreach ($results as $key => $term) {
       $new_term = clone $term;
       $new_term->real_post_count = $new_term->post_count;
       $boosted_int = mp_get_boosted_count($new_term->post_count, $new_term->term_id);
-      $new_term->post_count = mp_format_number_abbreviated($boosted_int);
+      $new_term->post_count = $boosted_int;
+      $new_term->formatted_post_count = mp_format_number_abbreviated($boosted_int);
       $results[$key] = $new_term;
     }
   }
 
   return $results;
+}
+
+function mp_should_apply_cold_start() {
+    if (!get_option('mp_cold_start_enabled')) {
+        return false;
+    }
+    if (defined('REST_REQUEST') && REST_REQUEST) {
+        return false;
+    }
+    return !is_admin();
 }
 
 function mp_get_boosted_count($count, $term_id) {
@@ -155,8 +165,7 @@ function mp_get_boosted_count($count, $term_id) {
 // Hook into get_terms to globally apply the cold start boost on the frontend
 add_filter('get_terms', 'mp_apply_cold_start_boost_to_terms', 10, 4);
 function mp_apply_cold_start_boost_to_terms($terms, $taxonomies, $args, $term_query) {
-    $is_frontend = !is_admin() || wp_doing_ajax();
-    if (get_option('mp_cold_start_enabled') && $is_frontend && is_array($terms)) {
+    if (mp_should_apply_cold_start() && is_array($terms)) {
         foreach ($terms as $key => $term) {
             if (is_object($term) && isset($term->count) && $term->count > 0) {
                 $new_term = clone $term;
@@ -175,8 +184,7 @@ function mp_apply_cold_start_boost_to_terms($terms, $taxonomies, $args, $term_qu
 // Hook into single term retrieval to globally apply the cold start boost
 add_filter('get_term', 'mp_apply_cold_start_boost_to_single_term', 10, 2);
 function mp_apply_cold_start_boost_to_single_term($term, $taxonomy) {
-    $is_frontend = !is_admin() || wp_doing_ajax();
-    if (get_option('mp_cold_start_enabled') && $is_frontend && is_object($term) && isset($term->count) && $term->count > 0) {
+    if (mp_should_apply_cold_start() && is_object($term) && isset($term->count) && $term->count > 0) {
         $new_term = clone $term;
         $new_term->real_count = $new_term->count;
         $new_term->count = mp_get_boosted_count($new_term->count, $new_term->term_id);
@@ -189,16 +197,15 @@ function mp_apply_cold_start_boost_to_single_term($term, $taxonomy) {
 // Format counts in standard wp_list_categories output without breaking float casting
 add_filter('wp_list_categories', 'mp_format_category_counts_html', 10, 2);
 function mp_format_category_counts_html($output, $args) {
-    $is_frontend = !is_admin() || wp_doing_ajax();
-    if (get_option('mp_cold_start_enabled') && $is_frontend && !empty($args['show_count'])) {
+    if (mp_should_apply_cold_start() && !empty($args['show_count'])) {
         // wp_list_categories outputs counts either wrapped in <span class="count">(1,234)</span> or just &nbsp;(1,234)
-        $output = preg_replace_callback('/<span class="count">\(([0-9,]+)\)<\/span>/', function($matches) {
-            $num = (int) str_replace(',', '', $matches[1]);
+        $output = preg_replace_callback('/<span class="count">\(([^)]+)\)<\/span>/', function($matches) {
+            $num = (int) preg_replace('/[^\d]/u', '', $matches[1]);
             return '<span class="count">(' . mp_format_number_abbreviated($num) . ')</span>';
         }, $output);
 
-        $output = preg_replace_callback('/&nbsp;\(([0-9,]+)\)/', function($matches) {
-            $num = (int) str_replace(',', '', $matches[1]);
+        $output = preg_replace_callback('/&nbsp;\(([^)]+)\)/u', function($matches) {
+            $num = (int) preg_replace('/[^\d]/u', '', $matches[1]);
             return '&nbsp;(' . mp_format_number_abbreviated($num) . ')';
         }, $output);
     }
