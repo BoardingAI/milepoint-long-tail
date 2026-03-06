@@ -150,6 +150,10 @@ function get_mp_terms_with_counts($taxonomy, $hide_empty = true)
 
       $results[$key] = $new_term;
     }
+
+    usort($results, function($a, $b) {
+      return $b->post_count <=> $a->post_count;
+    });
   }
 
   return $results;
@@ -228,7 +232,7 @@ function mp_get_boosted_count($count, $term_id) {
     // However, if $count passed in is > 0 but not in rank, that means it's a new or uncounted term.
     // In strict case, true_count = 0 means exclude.
     if (!isset($global_data['ranks'][$term_id])) {
-        return 0; // Term is completely excluded if not in global rank (meaning true_count == 0)
+        return (int)$count;
     }
 
     $rank = $global_data['ranks'][$term_id];
@@ -272,6 +276,12 @@ function mp_apply_cold_start_boost_to_terms($terms, $taxonomies, $args, $term_qu
                 $terms[$key] = $new_term;
             }
         }
+
+        usort($terms, function($a, $b) {
+            $count_a = is_object($a) && isset($a->count) ? (int)$a->count : 0;
+            $count_b = is_object($b) && isset($b->count) ? (int)$b->count : 0;
+            return $count_b <=> $count_a;
+        });
     }
     return $terms;
 }
