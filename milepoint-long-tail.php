@@ -242,8 +242,8 @@ function mp_get_boosted_count($count, $term_id) {
     $total_terms = $global_data['total_terms'];
 
     $config = [
-        'Scalar' => 50,
-        'Jitter_Range' => 500,
+        'Scalar' => 10,
+        'Jitter_Range' => 200,
         'Buffer' => 1
     ];
 
