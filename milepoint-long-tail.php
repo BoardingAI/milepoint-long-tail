@@ -125,13 +125,38 @@ function get_mp_terms_with_counts($taxonomy, $hide_empty = true)
 
   if (mp_should_apply_cold_start()) {
     foreach ($results as $key => $term) {
+      $true_count = (int)$term->post_count;
+      if ($true_count === 0) {
+        // If true count is 0, keep it unboosted per requirements
+        $new_term = clone $term;
+        $new_term->real_post_count = 0;
+        $new_term->post_count = 0;
+        $new_term->formatted_post_count = '0';
+        $results[$key] = $new_term;
+        continue;
+      }
+
       $new_term = clone $term;
-      $new_term->real_post_count = $new_term->post_count;
-      $boosted_int = mp_get_boosted_count($new_term->post_count, $new_term->term_id);
-      $new_term->post_count = $boosted_int;
-      $new_term->formatted_post_count = mp_format_number_abbreviated($boosted_int);
+      $new_term->real_post_count = $true_count;
+      $boosted_int = mp_get_boosted_count($true_count, $new_term->term_id);
+
+      if ($boosted_int > 0) {
+          $new_term->post_count = $boosted_int;
+          $new_term->formatted_post_count = number_format_i18n($boosted_int);
+      } else {
+          $new_term->post_count = 0;
+          $new_term->formatted_post_count = '0';
+      }
+
       $results[$key] = $new_term;
     }
+
+    usort($results, function($a, $b) {
+      if ($a->post_count === $b->post_count) {
+          return strcmp($a->name, $b->name);
+      }
+      return $b->post_count <=> $a->post_count;
+    });
   }
 
   return $results;
@@ -150,16 +175,14 @@ function mp_should_apply_cold_start() {
 function mp_get_boosted_count($count, $term_id) {
     if (!$count) return 0;
 
-    // Pseudo-random deterministic boost based on term_id
-    // Ensure the base relationship (highest counts stay highest) by multiplying
-    $base_boost = $count * 1500;
+    $min_base = 1000;
+    $max_base = 32000;
+    $range = $max_base - $min_base;
 
-    // Add a smaller pseudo-random factor using term_id so it doesn't look too perfect
-    // Ensure the random factor is small enough not to overtake the next highest post count
-    // Using a large prime multiplier (431) to drastically scatter sequential term IDs across the 0-999 range
-    $random_factor = ($term_id * 431) % 1000;
+    // Pure persistent ID-based base using pseudo-random hashing formula
+    $base_offset = $min_base + (($term_id * 7331) % $range);
 
-    return $base_boost + $random_factor;
+    return (int)($base_offset + $count);
 }
 
 // Hook into get_terms to globally apply the cold start boost on the frontend
@@ -169,13 +192,34 @@ function mp_apply_cold_start_boost_to_terms($terms, $taxonomies, $args, $term_qu
         foreach ($terms as $key => $term) {
             if (is_object($term) && isset($term->count) && $term->count > 0) {
                 $new_term = clone $term;
-                // We use a separate property to store the real count if needed elsewhere
-                $new_term->real_count = $new_term->count;
-                $new_term->count = mp_get_boosted_count($new_term->count, $new_term->term_id);
-                // Assign the formatted count to a custom property so frontend templates can use it
-                $new_term->formatted_boosted_count = mp_format_number_abbreviated($new_term->count);
+                $true_count = (int)$new_term->count;
+                $new_term->real_count = $true_count;
+
+                $boosted_int = mp_get_boosted_count($true_count, $new_term->term_id);
+
+                if ($boosted_int > 0) {
+                    $new_term->count = $boosted_int;
+                    $new_term->formatted_boosted_count = number_format_i18n($boosted_int);
+                } else {
+                    $new_term->count = 0;
+                    $new_term->formatted_boosted_count = '0';
+                }
+
                 $terms[$key] = $new_term;
             }
+        }
+
+        if (isset($args['orderby']) && $args['orderby'] === 'count') {
+            usort($terms, function($a, $b) {
+                $count_a = is_object($a) && isset($a->count) ? (int)$a->count : 0;
+                $count_b = is_object($b) && isset($b->count) ? (int)$b->count : 0;
+                if ($count_a === $count_b) {
+                    $id_a = is_object($a) && isset($a->term_id) ? (int)$a->term_id : 0;
+                    $id_b = is_object($b) && isset($b->term_id) ? (int)$b->term_id : 0;
+                    return $id_a <=> $id_b;
+                }
+                return $count_b <=> $count_a;
+            });
         }
     }
     return $terms;
@@ -186,9 +230,19 @@ add_filter('get_term', 'mp_apply_cold_start_boost_to_single_term', 10, 2);
 function mp_apply_cold_start_boost_to_single_term($term, $taxonomy) {
     if (mp_should_apply_cold_start() && is_object($term) && isset($term->count) && $term->count > 0) {
         $new_term = clone $term;
-        $new_term->real_count = $new_term->count;
-        $new_term->count = mp_get_boosted_count($new_term->count, $new_term->term_id);
-        $new_term->formatted_boosted_count = mp_format_number_abbreviated($new_term->count);
+        $true_count = (int)$new_term->count;
+        $new_term->real_count = $true_count;
+
+        $boosted_int = mp_get_boosted_count($true_count, $new_term->term_id);
+
+        if ($boosted_int > 0) {
+            $new_term->count = $boosted_int;
+            $new_term->formatted_boosted_count = number_format_i18n($boosted_int);
+        } else {
+            $new_term->count = 0;
+            $new_term->formatted_boosted_count = '0';
+        }
+
         return $new_term;
     }
     return $term;
@@ -201,28 +255,13 @@ function mp_format_category_counts_html($output, $args) {
         // wp_list_categories outputs counts either wrapped in <span class="count">(1,234)</span> or just &nbsp;(1,234)
         $output = preg_replace_callback('/<span class="count">\(([^)]+)\)<\/span>/', function($matches) {
             $num = (int) preg_replace('/[^\d]/u', '', $matches[1]);
-            return '<span class="count">(' . mp_format_number_abbreviated($num) . ')</span>';
+            return '<span class="count">(' . number_format_i18n($num) . ')</span>';
         }, $output);
 
         $output = preg_replace_callback('/&nbsp;\(([^)]+)\)/u', function($matches) {
             $num = (int) preg_replace('/[^\d]/u', '', $matches[1]);
-            return '&nbsp;(' . mp_format_number_abbreviated($num) . ')';
+            return '&nbsp;(' . number_format_i18n($num) . ')';
         }, $output);
     }
     return $output;
-}
-
-function mp_format_number_abbreviated($number) {
-    if ($number < 1000) {
-        return $number;
-    }
-
-    if ($number < 1000000) {
-        $formatted = number_format($number / 1000, 1);
-        // Remove .0 if it exists
-        return str_replace('.0', '', $formatted) . 'K';
-    }
-
-    $formatted = number_format($number / 1000000, 1);
-    return str_replace('.0', '', $formatted) . 'M';
 }
