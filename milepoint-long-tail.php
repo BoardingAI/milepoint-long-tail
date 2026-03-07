@@ -175,8 +175,8 @@ function mp_should_apply_cold_start() {
 function mp_get_boosted_count($count, $term_id) {
     if (!$count) return 0;
 
-    $min_base = 2000;
-    $max_base = 100000;
+    $min_base = 1000;
+    $max_base = 32000;
     $range = $max_base - $min_base;
 
     // Pure persistent ID-based base using pseudo-random hashing formula
