@@ -142,7 +142,7 @@ function get_mp_terms_with_counts($taxonomy, $hide_empty = true)
 
       if ($boosted_int > 0) {
           $new_term->post_count = $boosted_int;
-          $new_term->formatted_post_count = mp_format_number_abbreviated($boosted_int);
+          $new_term->formatted_post_count = number_format_i18n($boosted_int);
       } else {
           $new_term->post_count = 0;
           $new_term->formatted_post_count = '0';
@@ -199,7 +199,7 @@ function mp_apply_cold_start_boost_to_terms($terms, $taxonomies, $args, $term_qu
 
                 if ($boosted_int > 0) {
                     $new_term->count = $boosted_int;
-                    $new_term->formatted_boosted_count = mp_format_number_abbreviated($boosted_int);
+                    $new_term->formatted_boosted_count = number_format_i18n($boosted_int);
                 } else {
                     $new_term->count = 0;
                     $new_term->formatted_boosted_count = '0';
@@ -237,7 +237,7 @@ function mp_apply_cold_start_boost_to_single_term($term, $taxonomy) {
 
         if ($boosted_int > 0) {
             $new_term->count = $boosted_int;
-            $new_term->formatted_boosted_count = mp_format_number_abbreviated($boosted_int);
+            $new_term->formatted_boosted_count = number_format_i18n($boosted_int);
         } else {
             $new_term->count = 0;
             $new_term->formatted_boosted_count = '0';
@@ -255,28 +255,13 @@ function mp_format_category_counts_html($output, $args) {
         // wp_list_categories outputs counts either wrapped in <span class="count">(1,234)</span> or just &nbsp;(1,234)
         $output = preg_replace_callback('/<span class="count">\(([^)]+)\)<\/span>/', function($matches) {
             $num = (int) preg_replace('/[^\d]/u', '', $matches[1]);
-            return '<span class="count">(' . mp_format_number_abbreviated($num) . ')</span>';
+            return '<span class="count">(' . number_format_i18n($num) . ')</span>';
         }, $output);
 
         $output = preg_replace_callback('/&nbsp;\(([^)]+)\)/u', function($matches) {
             $num = (int) preg_replace('/[^\d]/u', '', $matches[1]);
-            return '&nbsp;(' . mp_format_number_abbreviated($num) . ')';
+            return '&nbsp;(' . number_format_i18n($num) . ')';
         }, $output);
     }
     return $output;
-}
-
-function mp_format_number_abbreviated($number) {
-    if ($number < 1000) {
-        return $number;
-    }
-
-    if ($number < 1000000) {
-        $formatted = number_format($number / 1000, 1);
-        // Remove .0 if it exists
-        return str_replace('.0', '', $formatted) . 'K';
-    }
-
-    $formatted = number_format($number / 1000000, 1);
-    return str_replace('.0', '', $formatted) . 'M';
 }
