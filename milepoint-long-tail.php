@@ -162,60 +162,6 @@ function get_mp_terms_with_counts($taxonomy, $hide_empty = true)
   return $results;
 }
 
-function mp_get_global_rank_data() {
-    static $rank_map = null;
-
-    if ($rank_map !== null) {
-        return $rank_map;
-    }
-
-    global $wpdb;
-
-    // Run ONE optimized $wpdb query that fetches term_id and the published milepoint_qa count
-    // for all terms where that count is > 0.
-    $query = "
-        SELECT t.term_id, COUNT(p.ID) as true_count
-        FROM {$wpdb->terms} t
-        INNER JOIN {$wpdb->term_taxonomy} tt ON t.term_id = tt.term_id
-        INNER JOIN {$wpdb->term_relationships} tr ON tt.term_taxonomy_id = tr.term_taxonomy_id
-        INNER JOIN {$wpdb->posts} p ON tr.object_id = p.ID
-        WHERE p.post_type = 'milepoint_qa'
-        AND p.post_status = 'publish'
-        GROUP BY t.term_id
-        HAVING true_count > 0
-    ";
-
-    $results = $wpdb->get_results($query, ARRAY_A);
-
-    if (empty($results)) {
-        $rank_map = [
-            'total_terms' => 0,
-            'ranks' => []
-        ];
-        return $rank_map;
-    }
-
-    // Sort in PHP memory: true_count DESC, term_id ASC
-    usort($results, function($a, $b) {
-        if ((int)$a['true_count'] === (int)$b['true_count']) {
-            return (int)$a['term_id'] <=> (int)$b['term_id'];
-        }
-        return (int)$b['true_count'] <=> (int)$a['true_count'];
-    });
-
-    $ranks = [];
-    foreach ($results as $index => $row) {
-        $ranks[$row['term_id']] = $index + 1; // Rank is 1-based index
-    }
-
-    $rank_map = [
-        'total_terms' => count($results),
-        'ranks' => $ranks
-    ];
-
-    return $rank_map;
-}
-
 function mp_should_apply_cold_start() {
     if (!get_option('mp_cold_start_enabled')) {
         return false;
@@ -229,31 +175,14 @@ function mp_should_apply_cold_start() {
 function mp_get_boosted_count($count, $term_id) {
     if (!$count) return 0;
 
-    $global_data = mp_get_global_rank_data();
+    $min_base = 2000;
+    $max_base = 100000;
+    $range = $max_base - $min_base;
 
-    // If the term is not in the ranks (true count is 0), return 0 early.
-    // However, if $count passed in is > 0 but not in rank, that means it's a new or uncounted term.
-    // In strict case, true_count = 0 means exclude.
-    if (!isset($global_data['ranks'][$term_id])) {
-        return (int)$count;
-    }
+    // Pure persistent ID-based base using pseudo-random hashing formula
+    $base_offset = $min_base + (($term_id * 7331) % $range);
 
-    $rank = $global_data['ranks'][$term_id];
-    $total_terms = $global_data['total_terms'];
-
-    $config = [
-        'Scalar' => 10,
-        'Jitter_Range' => 200,
-        'Buffer' => 1
-    ];
-
-    $base_offset = ($total_terms - $rank) * ($config['Jitter_Range'] + $config['Buffer']);
-    $jitter = $term_id % $config['Jitter_Range'];
-
-    // Final Display = ((Base Offset + Jitter) * Scalar) + True_Count
-    $final_display = (($base_offset + $jitter) * $config['Scalar']) + $count;
-
-    return (int)$final_display;
+    return (int)($base_offset + $count);
 }
 
 // Hook into get_terms to globally apply the cold start boost on the frontend
