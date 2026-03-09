@@ -66,10 +66,25 @@ function getDeepFlattenedClone(node) {
 
   const getCleanHTML = (node) => {
     if (!node) return "";
-    const clone = getDeepFlattenedClone(node);
 
-    // Get the HTML, strip all <!-- comments -->
-    return clone.innerHTML; //.replace(/<!--(.*?)-->/sg, '').trim();
+    // Create a temporary container to hold the cloned structure
+    // This allows querySelectorAll to easily query from the root, regardless of node type.
+    const container = document.createElement("div");
+    container.appendChild(getDeepFlattenedClone(node));
+
+    // Strip non-content / risky nodes
+    const riskySelectors = "style, script, noscript, template, iframe, object, embed, svg, canvas, meta, link";
+    container.querySelectorAll(riskySelectors).forEach((el) => el.remove());
+
+    let html = container.innerHTML;
+
+    // Narrow selector-dump cleanup: look for long comma-separated runs of IDs/classes
+    // Example: #Ads_BA_BS, #Ads_BA_BUT, #Ads_BA_BUT2...
+    // Looks for 10 or more comma-separated #id or .class patterns
+    const junkSelectorPattern = /(?:[#\.][a-zA-Z0-9_-]+(?:,\s*|\s+)){10,}[#\.][a-zA-Z0-9_-]+/g;
+    html = html.replace(junkSelectorPattern, "");
+
+    return html.trim();
   };
 
   const getTranscript = (thread) => {
