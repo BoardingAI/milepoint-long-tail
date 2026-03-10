@@ -177,9 +177,10 @@ public function handle_chatbot_ingest($request) {
     // Also remove self-closing or void versions of these tags just in case
     $html = preg_replace('/<(' . $risky_tags . ')[^>]*\/?>/is', '', $html);
 
-    // 2. Strip narrow selector-dump patterns (10+ comma-separated CSS selectors)
+    // 2. Strip narrow selector-dump patterns (10+ comma-separated IDs/Classes like #Ad, div.ad_160)
     // Match optional declaration block (?:\s*\{.*?\})?
-    $junk_selector_pattern = '/(?:[a-zA-Z0-9_#\.:\[\]=\-"\'\*\^\$\~>+ ]+(?:,\s*|\s+)){10,}[a-zA-Z0-9_#\.:\[\]=\-"\'\*\^\$\~>+ ]+(?:\s*\{.*?\})?/is';
+    // Requires a comma separator and at least one `#` or `.` per item to prevent matching normal prose.
+    $junk_selector_pattern = '/(?:[a-zA-Z0-9_-]*[#\.][a-zA-Z0-9_-]+,\s*){10,}[a-zA-Z0-9_-]*[#\.][a-zA-Z0-9_-]+(?:\s*\{.*?\})?/is';
     $html = preg_replace($junk_selector_pattern, '', $html);
 
     if ($html !== $original_html && $has_been_cleaned !== null) {
@@ -195,8 +196,7 @@ public function handle_chatbot_ingest($request) {
    */
   private function is_polluted($html) {
     if (empty($html)) return false;
-    // Uses the same broadened selector pattern but with a threshold of 5+
-    $quarantine_pattern = '/(?:[a-zA-Z0-9_#\.:\[\]=\-"\'\*\^\$\~>+ ]+(?:,\s*|\s+)){5,}[a-zA-Z0-9_#\.:\[\]=\-"\'\*\^\$\~>+ ]+/is';
+    $quarantine_pattern = '/(?:[a-zA-Z0-9_-]*[#\.][a-zA-Z0-9_-]+,\s*){5,}[a-zA-Z0-9_-]*[#\.][a-zA-Z0-9_-]+/is';
     return preg_match($quarantine_pattern, $html) === 1;
   }
 

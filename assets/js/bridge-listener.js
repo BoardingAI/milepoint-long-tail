@@ -80,15 +80,13 @@ function getDeepFlattenedClone(node) {
 
     // Strip non-content / risky nodes
     const riskySelectors = "style, script, noscript, template, iframe, object, embed, svg, canvas, meta, link";
-    container.querySelectorAll(riskySelectors).forEach((el) => el.remove());
+    container.querySelectorAll(riskySelectors).forEach((el) => { el.remove(); });
 
     let html = container.innerHTML;
 
-    // Narrow selector-dump cleanup: look for long comma-separated runs of CSS selectors
-    // Includes tags, IDs, classes, attributes, pseudo-classes, and combinators.
-    // Looks for 10 or more comma-separated selector patterns, and optionally
-    // their declaration block (e.g., { display: none }).
-    const junkSelectorPattern = /(?:[a-zA-Z0-9_#\.:\[\]=\-"'\*\^\$\~>+ ]+(?:,\s*|\s+)){10,}[a-zA-Z0-9_#\.:\[\]=\-"'\*\^\$\~>+ ]+(?:\s*\{[^{}]*\})?/g;
+    // Narrow selector-dump cleanup: look for long comma-separated runs of IDs/classes (e.g., #Ads_BA_BS, div.ad_160...)
+    // Requires a comma separator and at least one `#` or `.` per item to prevent matching normal prose.
+    const junkSelectorPattern = /(?:[a-zA-Z0-9_-]*[#\.][a-zA-Z0-9_-]+,\s*){10,}[a-zA-Z0-9_-]*[#\.][a-zA-Z0-9_-]+(?:\s*\{[^{}]*\})?/g;
     html = html.replace(junkSelectorPattern, "");
 
     return html.trim();
