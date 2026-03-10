@@ -168,6 +168,7 @@ public function handle_chatbot_ingest($request) {
    */
   private function pre_clean_html($html) {
     if (empty($html)) return '';
+    $original_html = $html;
 
     // 1. Strip <style> and <script> blocks entirely, and other risky non-content nodes
     $risky_tags = 'style|script|noscript|template|iframe|object|embed|svg|canvas|meta|link';
@@ -181,6 +182,11 @@ public function handle_chatbot_ingest($request) {
     $junk_selector_pattern = '/(?:[#\.][a-zA-Z0-9_-]+(?:,\s*|\s+)){10,}[#\.][a-zA-Z0-9_-]+(?:\s*\{.*?\})?/is';
     $html = preg_replace($junk_selector_pattern, '', $html);
 
+    if ($html !== $original_html) {
+        $cleaned_count = (int) get_option('mp_sludge_cleaned_count', 0);
+        update_option('mp_sludge_cleaned_count', $cleaned_count + 1);
+    }
+
     return trim($html);
   }
 
@@ -191,7 +197,14 @@ public function handle_chatbot_ingest($request) {
   private function is_polluted($html) {
     if (empty($html)) return false;
     $quarantine_pattern = '/(?:[#\.][a-zA-Z0-9_-]+(?:,\s*|\s+)){5,}[#\.][a-zA-Z0-9_-]+/is';
-    return preg_match($quarantine_pattern, $html) === 1;
+    $is_polluted = preg_match($quarantine_pattern, $html) === 1;
+
+    if ($is_polluted) {
+        $quarantine_count = (int) get_option('mp_sludge_quarantined_count', 0);
+        update_option('mp_sludge_quarantined_count', $quarantine_count + 1);
+    }
+
+    return $is_polluted;
   }
 
   /**
