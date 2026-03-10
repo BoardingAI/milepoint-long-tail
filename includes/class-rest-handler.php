@@ -166,7 +166,7 @@ public function handle_chatbot_ingest($request) {
    * Strips entire <style> and <script> blocks (tags + content)
    * and removes long chains of CSS selectors.
    */
-  private function pre_clean_html($html) {
+  private function pre_clean_html($html, &$has_been_cleaned = null) {
     if (empty($html)) return '';
     $original_html = $html;
 
@@ -177,14 +177,13 @@ public function handle_chatbot_ingest($request) {
     // Also remove self-closing or void versions of these tags just in case
     $html = preg_replace('/<(' . $risky_tags . ')[^>]*\/?>/is', '', $html);
 
-    // 2. Strip narrow selector-dump patterns (10+ comma-separated #id or .class)
+    // 2. Strip narrow selector-dump patterns (10+ comma-separated CSS selectors)
     // Match optional declaration block (?:\s*\{.*?\})?
-    $junk_selector_pattern = '/(?:[#\.][a-zA-Z0-9_-]+(?:,\s*|\s+)){10,}[#\.][a-zA-Z0-9_-]+(?:\s*\{.*?\})?/is';
+    $junk_selector_pattern = '/(?:[a-zA-Z0-9_#\.:\[\]=\-"\'\*\^\$\~>+ ]+(?:,\s*|\s+)){10,}[a-zA-Z0-9_#\.:\[\]=\-"\'\*\^\$\~>+ ]+(?:\s*\{.*?\})?/is';
     $html = preg_replace($junk_selector_pattern, '', $html);
 
-    if ($html !== $original_html) {
-        $cleaned_count = (int) get_option('mp_sludge_cleaned_count', 0);
-        update_option('mp_sludge_cleaned_count', $cleaned_count + 1);
+    if ($html !== $original_html && $has_been_cleaned !== null) {
+        $has_been_cleaned = true;
     }
 
     return trim($html);
@@ -196,15 +195,9 @@ public function handle_chatbot_ingest($request) {
    */
   private function is_polluted($html) {
     if (empty($html)) return false;
-    $quarantine_pattern = '/(?:[#\.][a-zA-Z0-9_-]+(?:,\s*|\s+)){5,}[#\.][a-zA-Z0-9_-]+/is';
-    $is_polluted = preg_match($quarantine_pattern, $html) === 1;
-
-    if ($is_polluted) {
-        $quarantine_count = (int) get_option('mp_sludge_quarantined_count', 0);
-        update_option('mp_sludge_quarantined_count', $quarantine_count + 1);
-    }
-
-    return $is_polluted;
+    // Uses the same broadened selector pattern but with a threshold of 5+
+    $quarantine_pattern = '/(?:[a-zA-Z0-9_#\.:\[\]=\-"\'\*\^\$\~>+ ]+(?:,\s*|\s+)){5,}[a-zA-Z0-9_#\.:\[\]=\-"\'\*\^\$\~>+ ]+/is';
+    return preg_match($quarantine_pattern, $html) === 1;
   }
 
   /**
@@ -216,12 +209,13 @@ public function handle_chatbot_ingest($request) {
     $thread_id = sanitize_text_field($params["thread_id"] ?? "");
 
     $has_pollution = false;
+    $has_been_cleaned = false;
 
     // THE FIX: We must explicitly map the 'sources' array so it isn't discarded
-    $transcript = array_map(function ($item) use (&$has_pollution, $thread_id) {
+    $transcript = array_map(function ($item) use (&$has_pollution, &$has_been_cleaned, $thread_id) {
       // Pre-clean answer and question before kses
-      $clean_question = $this->pre_clean_html($item["question"] ?? "");
-      $clean_answer = $this->pre_clean_html($item["answer"] ?? "");
+      $clean_question = $this->pre_clean_html($item["question"] ?? "", $has_been_cleaned);
+      $clean_answer = $this->pre_clean_html($item["answer"] ?? "", $has_been_cleaned);
 
       // Check for remaining pollution that should trigger a quarantine
       if ($this->is_polluted($clean_answer) || $this->is_polluted($clean_question)) {
@@ -231,12 +225,12 @@ public function handle_chatbot_ingest($request) {
 
       // Sanitize the internal sources array if it exists
       $sources = isset($item["sources"])
-        ? array_map(function ($source) use (&$has_pollution, $thread_id) {
+        ? array_map(function ($source) use (&$has_pollution, &$has_been_cleaned, $thread_id) {
           // Defensive guard: Ensure required fields exist
           if (empty($source["url"]) || empty($source["title"])) {
             return null;
           }
-          $clean_excerpt = $this->pre_clean_html($source["excerpt"] ?? "");
+          $clean_excerpt = $this->pre_clean_html($source["excerpt"] ?? "", $has_been_cleaned);
 
           if ($this->is_polluted($clean_excerpt)) {
               $has_pollution = true;
@@ -289,6 +283,17 @@ public function handle_chatbot_ingest($request) {
 
     if ($total_sources === 0) {
       return new WP_REST_Response(["message" => "Skipped: No sources"], 200);
+    }
+
+    // Only update counts once per request if post creation/update is actually going to proceed
+    if ($has_been_cleaned) {
+        $cleaned_count = (int) get_option('mp_sludge_cleaned_count', 0);
+        update_option('mp_sludge_cleaned_count', $cleaned_count + 1);
+    }
+
+    if ($has_pollution) {
+        $quarantine_count = (int) get_option('mp_sludge_quarantined_count', 0);
+        update_option('mp_sludge_quarantined_count', $quarantine_count + 1);
     }
 
     // 1. Check if post already exists

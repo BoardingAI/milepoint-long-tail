@@ -84,11 +84,11 @@ function getDeepFlattenedClone(node) {
 
     let html = container.innerHTML;
 
-    // Narrow selector-dump cleanup: look for long comma-separated runs of IDs/classes
-    // Example: #Ads_BA_BS, #Ads_BA_BUT, #Ads_BA_BUT2...
-    // Looks for 10 or more comma-separated #id or .class patterns, and optionally
+    // Narrow selector-dump cleanup: look for long comma-separated runs of CSS selectors
+    // Includes tags, IDs, classes, attributes, pseudo-classes, and combinators.
+    // Looks for 10 or more comma-separated selector patterns, and optionally
     // their declaration block (e.g., { display: none }).
-    const junkSelectorPattern = /(?:[#\.][a-zA-Z0-9_-]+(?:,\s*|\s+)){10,}[#\.][a-zA-Z0-9_-]+(?:\s*\{[^{}]*\})?/g;
+    const junkSelectorPattern = /(?:[a-zA-Z0-9_#\.:\[\]=\-"'\*\^\$\~>+ ]+(?:,\s*|\s+)){10,}[a-zA-Z0-9_#\.:\[\]=\-"'\*\^\$\~>+ ]+(?:\s*\{[^{}]*\})?/g;
     html = html.replace(junkSelectorPattern, "");
 
     return html.trim();
