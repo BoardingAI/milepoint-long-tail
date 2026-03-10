@@ -73,10 +73,20 @@ function getDeepFlattenedClone(node) {
   const getCleanHTML = (node) => {
     if (!node) return "";
 
-    // Create a temporary container to hold the cloned structure
-    // This allows querySelectorAll to easily query from the root, regardless of node type.
+    const clone = getDeepFlattenedClone(node);
+
+    // Create a temporary container to hold the cloned structure's CHILDREN
+    // If we append the clone itself, container.innerHTML includes the outer tag
+    // (e.g., <div class="question">). We only want the inner HTML.
     const container = document.createElement("div");
-    container.appendChild(getDeepFlattenedClone(node));
+    if (clone.nodeType === Node.DOCUMENT_FRAGMENT_NODE || clone.nodeType === Node.TEXT_NODE) {
+      container.appendChild(clone);
+    } else {
+      // It's an element, append its children
+      while (clone.firstChild) {
+        container.appendChild(clone.firstChild);
+      }
+    }
 
     // Strip non-content / risky nodes
     const riskySelectors = "style, script, noscript, template, iframe, object, embed, svg, canvas, meta, link";
