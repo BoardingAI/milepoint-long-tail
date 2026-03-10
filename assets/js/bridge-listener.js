@@ -15,6 +15,7 @@ function getBreakdown() {
 
     breakdown = Array.from(columns).map((col) => {
       const labelSpan = col.querySelector(".label");
+      if (!labelSpan) return null;
 
       // The percentage is inside the <b> tag
       const percentage = labelSpan.querySelector("b")?.innerText.trim() || "";
@@ -30,7 +31,7 @@ function getBreakdown() {
         source: sourceName,
         percentage: Number(percentage.replace("%", "") || 0),
       };
-    });
+    }).filter(Boolean);
   } else {
     console.log("Attribution bar or Shadow Root not found.");
   }
@@ -38,9 +39,14 @@ function getBreakdown() {
 }
 
 function getDeepFlattenedClone(node) {
-  // 1. Handle text and comments directly
-  if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.COMMENT_NODE) {
+  // 1. Handle text directly
+  if (node.nodeType === Node.TEXT_NODE) {
     return node.cloneNode();
+  }
+
+  // 1b. Skip comments entirely to prevent non-content junk
+  if (node.nodeType === Node.COMMENT_NODE) {
+    return document.createTextNode("");
   }
 
   // 2. If it's a pill, return its shadow content (dissolving the pill tag)
@@ -66,10 +72,34 @@ function getDeepFlattenedClone(node) {
 
   const getCleanHTML = (node) => {
     if (!node) return "";
+
     const clone = getDeepFlattenedClone(node);
 
-    // Get the HTML, strip all <!-- comments -->
-    return clone.innerHTML; //.replace(/<!--(.*?)-->/sg, '').trim();
+    // Create a temporary container to hold the cloned structure's CHILDREN
+    // If we append the clone itself, container.innerHTML includes the outer tag
+    // (e.g., <div class="question">). We only want the inner HTML.
+    const container = document.createElement("div");
+    if (clone.nodeType === Node.DOCUMENT_FRAGMENT_NODE || clone.nodeType === Node.TEXT_NODE) {
+      container.appendChild(clone);
+    } else {
+      // It's an element, append its children
+      while (clone.firstChild) {
+        container.appendChild(clone.firstChild);
+      }
+    }
+
+    // Strip non-content / risky nodes
+    const riskySelectors = "style, script, noscript, template, iframe, object, embed, svg, canvas, meta, link";
+    container.querySelectorAll(riskySelectors).forEach((el) => { el.remove(); });
+
+    let html = container.innerHTML;
+
+    // Narrow selector-dump cleanup: look for long comma-separated runs of IDs/classes (e.g., #Ads_BA_BS, div.ad_160...)
+    // Requires a comma separator and at least one `#` or `.` per item to prevent matching normal prose.
+    const junkSelectorPattern = /(?:[a-zA-Z0-9_-]*[#\.][a-zA-Z0-9_-]+,\s*){10,}[a-zA-Z0-9_-]*[#\.][a-zA-Z0-9_-]+(?:\s*\{[^{}]*\})?/g;
+    html = html.replace(junkSelectorPattern, "");
+
+    return html.trim();
   };
 
   const getTranscript = (thread) => {
@@ -119,7 +149,9 @@ function getDeepFlattenedClone(node) {
     const items = relatedWidget.shadowRoot.querySelectorAll(
       ".related-question-item span",
     );
-    return Array.from(items).map((el) => el.innerHTML.trim());
+    return Array.from(items)
+      .map((el) => (el.textContent || "").trim())
+      .filter(Boolean);
   };
 
   const runPoll = async () => {

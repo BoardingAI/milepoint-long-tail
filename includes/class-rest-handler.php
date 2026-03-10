@@ -162,6 +162,45 @@ public function handle_chatbot_ingest($request) {
   }
 
   /**
+   * Helper function to pre-clean HTML before wp_kses_post
+   * Strips entire <style> and <script> blocks (tags + content)
+   * and removes long chains of CSS selectors.
+   */
+  private function pre_clean_html($html, &$has_been_cleaned = null) {
+    if (empty($html)) return '';
+    $original_html = $html;
+
+    // 1. Strip <style> and <script> blocks entirely, and other risky non-content nodes
+    $risky_tags = 'style|script|noscript|template|iframe|object|embed|svg|canvas|meta|link';
+    $html = preg_replace('/<(' . $risky_tags . ')[^>]*>.*?<\/\1>/is', '', $html);
+
+    // Also remove self-closing or void versions of these tags just in case
+    $html = preg_replace('/<(' . $risky_tags . ')[^>]*\/?>/is', '', $html);
+
+    // 2. Strip narrow selector-dump patterns (10+ comma-separated IDs/Classes like #Ad, div.ad_160)
+    // Match optional declaration block (?:\s*\{.*?\})?
+    // Requires a comma separator and at least one `#` or `.` per item to prevent matching normal prose.
+    $junk_selector_pattern = '/(?:[a-zA-Z0-9_-]*[#\.][a-zA-Z0-9_-]+,\s*){10,}[a-zA-Z0-9_-]*[#\.][a-zA-Z0-9_-]+(?:\s*\{.*?\})?/is';
+    $html = preg_replace($junk_selector_pattern, '', $html);
+
+    if ($html !== $original_html && $has_been_cleaned !== null) {
+        $has_been_cleaned = true;
+    }
+
+    return trim($html);
+  }
+
+  /**
+   * Helper function to detect if a payload is still polluted after pre-cleaning.
+   * We use a lower threshold here (e.g., 5+) just to be safe and trigger quarantine.
+   */
+  private function is_polluted($html) {
+    if (empty($html)) return false;
+    $quarantine_pattern = '/(?:[a-zA-Z0-9_-]*[#\.][a-zA-Z0-9_-]+,\s*){5,}[a-zA-Z0-9_-]*[#\.][a-zA-Z0-9_-]+/is';
+    return preg_match($quarantine_pattern, $html) === 1;
+  }
+
+  /**
    * Handle the incoming JSON from the JS listener
    */
   public function handle_ingest($request)
@@ -169,21 +208,41 @@ public function handle_chatbot_ingest($request) {
     $params = $request->get_json_params();
     $thread_id = sanitize_text_field($params["thread_id"] ?? "");
 
+    $has_pollution = false;
+    $has_been_cleaned = false;
+
     // THE FIX: We must explicitly map the 'sources' array so it isn't discarded
-    $transcript = array_map(function ($item) {
+    $transcript = array_map(function ($item) use (&$has_pollution, &$has_been_cleaned, $thread_id) {
+      // Pre-clean answer and question before kses
+      $clean_question = $this->pre_clean_html($item["question"] ?? "", $has_been_cleaned);
+      $clean_answer = $this->pre_clean_html($item["answer"] ?? "", $has_been_cleaned);
+
+      // Check for remaining pollution that should trigger a quarantine
+      if ($this->is_polluted($clean_answer) || $this->is_polluted($clean_question)) {
+          $has_pollution = true;
+          error_log("MilePoint: Quarantine triggered - selector dump detected in question/answer in thread " . sanitize_text_field($thread_id ?? 'unknown'));
+      }
+
       // Sanitize the internal sources array if it exists
       $sources = isset($item["sources"])
-        ? array_map(function ($source) {
+        ? array_map(function ($source) use (&$has_pollution, &$has_been_cleaned, $thread_id) {
           // Defensive guard: Ensure required fields exist
           if (empty($source["url"]) || empty($source["title"])) {
             return null;
           }
+          $clean_excerpt = $this->pre_clean_html($source["excerpt"] ?? "", $has_been_cleaned);
+
+          if ($this->is_polluted($clean_excerpt)) {
+              $has_pollution = true;
+              error_log("MilePoint: Quarantine triggered - selector dump detected in source excerpt in thread " . sanitize_text_field($thread_id ?? 'unknown'));
+          }
+
           return [
             "url" => esc_url_raw($source["url"]),
             "title" => sanitize_text_field($source["title"]),
             "source" => sanitize_text_field($source["source"]),
             "favicon" => esc_url_raw($source["favicon"]),
-            "excerpt" => wp_kses_post($source["excerpt"]),
+            "excerpt" => wp_kses_post($clean_excerpt),
           ];
         }, $item["sources"])
         : [];
@@ -192,8 +251,8 @@ public function handle_chatbot_ingest($request) {
       $sources = array_filter($sources);
 
       return [
-        "question" => wp_kses_post($item["question"]),
-        "answer" => wp_kses_post($item["answer"]),
+        "question" => wp_kses_post($clean_question),
+        "answer" => wp_kses_post($clean_answer),
         "sources" => $sources, // <--- This allows it to be saved to Post Meta
       ];
     }, $params["full_transcript"] ?? []);
@@ -226,27 +285,49 @@ public function handle_chatbot_ingest($request) {
       return new WP_REST_Response(["message" => "Skipped: No sources"], 200);
     }
 
+    // Only update counts once per request if post creation/update is actually going to proceed
+    if ($has_been_cleaned) {
+        $cleaned_count = (int) get_option('mp_sludge_cleaned_count', 0);
+        update_option('mp_sludge_cleaned_count', $cleaned_count + 1);
+    }
+
+    if ($has_pollution) {
+        $quarantine_count = (int) get_option('mp_sludge_quarantined_count', 0);
+        update_option('mp_sludge_quarantined_count', $quarantine_count + 1);
+    }
+
     // 1. Check if post already exists
     $existing_id = $this->get_post_id_by_thread($thread_id);
 
     if ($existing_id) {
       // Rolling hold strategy: If post is scheduled ('future'), reset the 24h timer
       $status = get_post_status($existing_id);
-      if ($status === "future") {
-        $future_ts_gmt = current_time("timestamp", true) + DAY_IN_SECONDS;
-        $post_date_gmt = gmdate("Y-m-d H:i:s", $future_ts_gmt);
-        $post_date = get_date_from_gmt($post_date_gmt);
 
-        $update_result = wp_update_post([
+      // Quarantine: If pollution is detected, downgrade status to draft
+      $new_status = $has_pollution ? 'draft' : $status;
+
+      if ($status === "future" || $has_pollution) {
+        $update_args = [
           "ID" => $existing_id,
-          "post_date" => $post_date,
-          "post_date_gmt" => $post_date_gmt,
-        ]);
+          "post_status" => $new_status,
+        ];
+
+        // Only reset the timer if it's staying 'future'
+        if ($new_status === "future") {
+            $future_ts_gmt = current_time("timestamp", true) + DAY_IN_SECONDS;
+            $post_date_gmt = gmdate("Y-m-d H:i:s", $future_ts_gmt);
+            $post_date = get_date_from_gmt($post_date_gmt);
+
+            $update_args["post_date"] = $post_date;
+            $update_args["post_date_gmt"] = $post_date_gmt;
+        }
+
+        $update_result = wp_update_post($update_args);
 
         if ($update_result === 0) {
-          error_log("MilePoint: Failed to reschedule post " . $existing_id);
+          error_log("MilePoint: Failed to update/reschedule post " . $existing_id);
           return new WP_REST_Response(
-            ["message" => "Failed to reschedule post."],
+            ["message" => "Failed to update/reschedule post."],
             500,
           );
         }
@@ -274,10 +355,13 @@ public function handle_chatbot_ingest($request) {
     $post_date_gmt = gmdate("Y-m-d H:i:s", $future_ts_gmt);
     $post_date = get_date_from_gmt($post_date_gmt);
 
+    // Quarantine: default to draft if pollution detected
+    $initial_status = $has_pollution ? "draft" : "future";
+
     $post_id = wp_insert_post([
       "post_title" => $first_question,
       "post_content" => "<!-- MILEPOINT_LONG_TAIL -->",
-      "post_status" => "future",
+      "post_status" => $initial_status,
       "post_type" => "milepoint_qa",
       "post_date" => $post_date,
       "post_date_gmt" => $post_date_gmt,

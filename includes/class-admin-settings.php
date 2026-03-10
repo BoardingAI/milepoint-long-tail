@@ -54,9 +54,24 @@ class MP_QA_Settings
   public function render_settings_page()
   {
     $key = get_option("mp_openai_api_key");
-    $cold_start_enabled = get_option("mp_cold_start_enabled"); ?>
+    $cold_start_enabled = get_option("mp_cold_start_enabled");
+
+    // Sludge tracking metrics
+    $cleaned_count = (int) get_option("mp_sludge_cleaned_count", 0);
+    $quarantined_count = (int) get_option("mp_sludge_quarantined_count", 0);
+    ?>
         <div class="wrap">
             <h1>Milepoint Q&A Settings</h1>
+
+            <div class="notice notice-info inline" style="margin-top:20px; padding:15px; border-left-color: #007cba;">
+                <h3 style="margin-top:0;">Ad-Blocker & Sludge Tracking</h3>
+                <p>The listener automatically detects and removes injected CSS (ad-blocker sludge) from incoming chat transcripts.</p>
+                <ul style="list-style:disc; margin-left: 20px;">
+                    <li><strong>Transcripts Cleaned:</strong> <?php echo esc_html($cleaned_count); ?> <em>(Minor sludge removed successfully)</em></li>
+                    <li><strong>Posts Quarantined:</strong> <?php echo esc_html($quarantined_count); ?> <em>(Major sludge detected, post status forced to Draft)</em></li>
+                </ul>
+            </div>
+
             <form method="post" action="options.php">
                 <?php
                 settings_fields("mp_qa_settings_group");
