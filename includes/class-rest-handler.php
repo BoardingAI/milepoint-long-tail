@@ -169,12 +169,16 @@ public function handle_chatbot_ingest($request) {
   private function pre_clean_html($html) {
     if (empty($html)) return '';
 
-    // 1. Strip <style> and <script> blocks entirely
-    $html = preg_replace('/<(style|script)[^>]*>.*?<\/\1>/is', '', $html);
+    // 1. Strip <style> and <script> blocks entirely, and other risky non-content nodes
+    $risky_tags = 'style|script|noscript|template|iframe|object|embed|svg|canvas|meta|link';
+    $html = preg_replace('/<(' . $risky_tags . ')[^>]*>.*?<\/\1>/is', '', $html);
+
+    // Also remove self-closing or void versions of these tags just in case
+    $html = preg_replace('/<(' . $risky_tags . ')[^>]*\/?>/is', '', $html);
 
     // 2. Strip narrow selector-dump patterns (10+ comma-separated #id or .class)
-    // Same regex as client-side, using /is for case-insensitivity and dotall (though dotall not strictly needed here)
-    $junk_selector_pattern = '/(?:[#\.][a-zA-Z0-9_-]+(?:,\s*|\s+)){10,}[#\.][a-zA-Z0-9_-]+/is';
+    // Match optional declaration block (?:\s*\{.*?\})?
+    $junk_selector_pattern = '/(?:[#\.][a-zA-Z0-9_-]+(?:,\s*|\s+)){10,}[#\.][a-zA-Z0-9_-]+(?:\s*\{.*?\})?/is';
     $html = preg_replace($junk_selector_pattern, '', $html);
 
     return trim($html);
@@ -201,7 +205,7 @@ public function handle_chatbot_ingest($request) {
     $has_pollution = false;
 
     // THE FIX: We must explicitly map the 'sources' array so it isn't discarded
-    $transcript = array_map(function ($item) use (&$has_pollution) {
+    $transcript = array_map(function ($item) use (&$has_pollution, $thread_id) {
       // Pre-clean answer and question before kses
       $clean_question = $this->pre_clean_html($item["question"] ?? "");
       $clean_answer = $this->pre_clean_html($item["answer"] ?? "");
@@ -209,22 +213,29 @@ public function handle_chatbot_ingest($request) {
       // Check for remaining pollution that should trigger a quarantine
       if ($this->is_polluted($clean_answer) || $this->is_polluted($clean_question)) {
           $has_pollution = true;
-          error_log("MilePoint: Quarantine triggered - selector dump detected in thread " . sanitize_text_field($thread_id ?? 'unknown'));
+          error_log("MilePoint: Quarantine triggered - selector dump detected in question/answer in thread " . sanitize_text_field($thread_id ?? 'unknown'));
       }
 
       // Sanitize the internal sources array if it exists
       $sources = isset($item["sources"])
-        ? array_map(function ($source) {
+        ? array_map(function ($source) use (&$has_pollution, $thread_id) {
           // Defensive guard: Ensure required fields exist
           if (empty($source["url"]) || empty($source["title"])) {
             return null;
           }
+          $clean_excerpt = $this->pre_clean_html($source["excerpt"] ?? "");
+
+          if ($this->is_polluted($clean_excerpt)) {
+              $has_pollution = true;
+              error_log("MilePoint: Quarantine triggered - selector dump detected in source excerpt in thread " . sanitize_text_field($thread_id ?? 'unknown'));
+          }
+
           return [
             "url" => esc_url_raw($source["url"]),
             "title" => sanitize_text_field($source["title"]),
             "source" => sanitize_text_field($source["source"]),
             "favicon" => esc_url_raw($source["favicon"]),
-            "excerpt" => wp_kses_post($this->pre_clean_html($source["excerpt"] ?? "")),
+            "excerpt" => wp_kses_post($clean_excerpt),
           ];
         }, $item["sources"])
         : [];

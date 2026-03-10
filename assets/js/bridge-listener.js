@@ -15,6 +15,7 @@ function getBreakdown() {
 
     breakdown = Array.from(columns).map((col) => {
       const labelSpan = col.querySelector(".label");
+      if (!labelSpan) return null;
 
       // The percentage is inside the <b> tag
       const percentage = labelSpan.querySelector("b")?.innerText.trim() || "";
@@ -30,7 +31,7 @@ function getBreakdown() {
         source: sourceName,
         percentage: Number(percentage.replace("%", "") || 0),
       };
-    });
+    }).filter(Boolean);
   } else {
     console.log("Attribution bar or Shadow Root not found.");
   }
@@ -38,9 +39,14 @@ function getBreakdown() {
 }
 
 function getDeepFlattenedClone(node) {
-  // 1. Handle text and comments directly
-  if (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.COMMENT_NODE) {
+  // 1. Handle text directly
+  if (node.nodeType === Node.TEXT_NODE) {
     return node.cloneNode();
+  }
+
+  // 1b. Skip comments entirely to prevent non-content junk
+  if (node.nodeType === Node.COMMENT_NODE) {
+    return document.createTextNode("");
   }
 
   // 2. If it's a pill, return its shadow content (dissolving the pill tag)
@@ -80,8 +86,9 @@ function getDeepFlattenedClone(node) {
 
     // Narrow selector-dump cleanup: look for long comma-separated runs of IDs/classes
     // Example: #Ads_BA_BS, #Ads_BA_BUT, #Ads_BA_BUT2...
-    // Looks for 10 or more comma-separated #id or .class patterns
-    const junkSelectorPattern = /(?:[#\.][a-zA-Z0-9_-]+(?:,\s*|\s+)){10,}[#\.][a-zA-Z0-9_-]+/g;
+    // Looks for 10 or more comma-separated #id or .class patterns, and optionally
+    // their declaration block (e.g., { display: none }).
+    const junkSelectorPattern = /(?:[#\.][a-zA-Z0-9_-]+(?:,\s*|\s+)){10,}[#\.][a-zA-Z0-9_-]+(?:\s*\{[^{}]*\})?/g;
     html = html.replace(junkSelectorPattern, "");
 
     return html.trim();
@@ -134,7 +141,9 @@ function getDeepFlattenedClone(node) {
     const items = relatedWidget.shadowRoot.querySelectorAll(
       ".related-question-item span",
     );
-    return Array.from(items).map((el) => el.innerHTML.trim());
+    return Array.from(items)
+      .map((el) => (el.textContent || "").trim())
+      .filter(Boolean);
   };
 
   const runPoll = async () => {
