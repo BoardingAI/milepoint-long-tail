@@ -1,0 +1,131 @@
+{
+    "@context": "https://schema.org",
+    "@graph": [
+        {
+            "@type": "Organization",
+            "@id": "https://example.com/#organization",
+            "name": "Mock Publisher",
+            "url": "https://example.com/"
+        },
+        {
+            "@type": "WebSite",
+            "@id": "https://example.com/#website",
+            "url": "https://example.com/",
+            "name": "Mock Publisher",
+            "publisher": {
+                "@id": "https://example.com/#organization"
+            },
+            "inLanguage": "en-US",
+            "potentialAction": {
+                "@type": "SearchAction",
+                "target": "https://example.com/?s={search_term_string}",
+                "query-input": "required name=search_term_string"
+            }
+        },
+        {
+            "@type": "CollectionPage",
+            "@id": "https://example.com/questions/#collection",
+            "url": "https://example.com/questions/",
+            "name": "Questions Archive",
+            "isPartOf": {
+                "@id": "https://example.com/#website"
+            }
+        },
+        {
+            "@type": "BreadcrumbList",
+            "@id": "https://example.com/questions/mock-post/#breadcrumb",
+            "itemListElement": [
+                {
+                    "@type": "ListItem",
+                    "position": 1,
+                    "item": {
+                        "@id": "https://example.com/#website",
+                        "name": "Home"
+                    }
+                },
+                {
+                    "@type": "ListItem",
+                    "position": 2,
+                    "item": {
+                        "@id": "https://example.com/questions/#collection",
+                        "name": "Questions"
+                    }
+                },
+                {
+                    "@type": "ListItem",
+                    "position": 3,
+                    "item": {
+                        "@id": "https://example.com/questions/mock-post/",
+                        "name": "How many points for a free night?"
+                    }
+                }
+            ]
+        },
+        {
+            "@type": "WebPage",
+            "@id": "https://example.com/questions/mock-post/",
+            "url": "https://example.com/questions/mock-post/",
+            "name": "How many points for a free night?",
+            "isPartOf": {
+                "@id": "https://example.com/#website"
+            },
+            "breadcrumb": {
+                "@id": "https://example.com/questions/mock-post/#breadcrumb"
+            },
+            "mainEntity": {
+                "@id": "https://example.com/questions/mock-post/#posting"
+            },
+            "datePublished": "2023-10-27T10:00:00+00:00",
+            "dateModified": "2023-10-27T10:00:00+00:00"
+        },
+        {
+            "@type": "Person",
+            "@id": "https://example.com/questions/mock-post/#author",
+            "name": "Guest"
+        },
+        {
+            "@type": "Person",
+            "@id": "https://example.com/questions/mock-post/#ai-assistant",
+            "name": "AI Assistant"
+        },
+        {
+            "@type": "Comment",
+            "@id": "https://example.com/questions/mock-post/#comment-a-0",
+            "name": "Answer 1",
+            "text": "You need exactly 50,000 points.",
+            "datePublished": "2023-10-27T10:00:00+00:00",
+            "url": "https://example.com/questions/mock-post/#mp-a-0",
+            "author": {
+                "@id": "https://example.com/questions/mock-post/#ai-assistant"
+            }
+        },
+        {
+            "@type": "DiscussionForumPosting",
+            "@id": "https://example.com/questions/mock-post/#posting",
+            "headline": "How many points for a free night?",
+            "text": "How many points for a free night?",
+            "datePublished": "2023-10-27T10:00:00+00:00",
+            "dateModified": "2023-10-27T10:00:00+00:00",
+            "author": {
+                "@id": "https://example.com/questions/mock-post/#author"
+            },
+            "publisher": {
+                "@id": "https://example.com/#organization"
+            },
+            "mainEntityOfPage": {
+                "@id": "https://example.com/questions/mock-post/"
+            },
+            "interactionStatistic": {
+                "@type": "InteractionCounter",
+                "interactionType": "https://schema.org/CommentAction",
+                "userInteractionCount": 1
+            },
+            "comment": [
+                {
+                    "@id": "https://example.com/questions/mock-post/#comment-a-0"
+                }
+            ],
+            "description": "A question about points."
+        }
+    ]
+}

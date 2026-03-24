@@ -115,10 +115,13 @@ class MP_Content_Template
     $related = get_post_meta($post_id, "_related_suggestions", true);
     $breakdown_data = get_post_meta($post_id, "_breakdown", true);
     $is_primary_meta = get_post_meta($post_id, "_mp_is_primary_turn", true);
-    $is_primary = $is_primary_meta === '' || !empty($is_primary_meta); // Handle empty (legacy) or true cases as primary
+    $is_primary = $is_primary_meta === '' || $is_primary_meta === "1"; // Handle empty (legacy) or explicitly "1" as primary
 
     $html = '<div id="mp-hover-card"></div>';
     $html .= '<div class="mp-qa-container">';
+
+    // Emit the single turn array into the DOM for hover JS dependencies
+    $html .= '<script type="application/json" id="mp-qa-content">' . wp_json_encode([$single_turn]) . "</script>";
 
     $question = $this->clean_lit_comments($single_turn["question"] ?? "");
     $answer = $this->clean_lit_comments($single_turn["answer"] ?? "");

@@ -348,7 +348,7 @@ public function handle_chatbot_ingest($request) {
     update_post_meta($primary_id, "_gist_thread_id", $thread_id);
     update_post_meta($primary_id, "_mp_source_thread_id", $thread_id);
     update_post_meta($primary_id, "_mp_source_turn_index", 0);
-    update_post_meta($primary_id, "_mp_is_primary_turn", true);
+    update_post_meta($primary_id, "_mp_is_primary_turn", "1");
 
     // Store full raw transcript privately
     update_post_meta($primary_id, "_raw_transcript", $transcript);
@@ -415,8 +415,17 @@ public function handle_chatbot_ingest($request) {
            $ai_res = $ai_handler->get_followup_classification($api_key, $first_question_text, $prior_context, wp_strip_all_tags($q_text), wp_strip_all_tags($a_text));
            if ($ai_res && isset($ai_res['classification'])) {
              $classification = $ai_res['classification'];
+             // Whitelist output constraints to prevent AI hallucination saving unsupported buckets
+             $allowed_buckets = ['ready_as_is', 'needs_rewrite_review', 'hold'];
+             if (!in_array($classification, $allowed_buckets)) {
+                 error_log("MilePoint: AI returned unsupported bucket: " . $classification . ". Falling back to hold.");
+                 $classification = "hold";
+                 $classification_failed = true;
+             }
+
              $reason = $ai_res['reason'] ?? '';
              $confidence = $ai_res['confidence'] ?? '';
+
              if ($classification === 'needs_rewrite_review') {
                  // Clean AI output immediately
                  $rewritten_q = sanitize_text_field($ai_res['rewritten_question'] ?? '');
@@ -453,14 +462,24 @@ public function handle_chatbot_ingest($request) {
                 "post_status" => "draft", // Always non-public
                 "post_type" => "milepoint_qa",
               ]);
-              $followup_id = (!is_wp_error($new_id) && !empty($new_id)) ? $new_id : false;
+
+              if (is_wp_error($new_id) || empty($new_id)) {
+                  error_log("MilePoint: Failed to insert follow-up post for thread " . $thread_id . " turn " . $i);
+                  $followup_id = false;
+              } else {
+                  $followup_id = $new_id;
+              }
           } else {
               // The post already exists but we just successfully re-ran AI on it (recovery from failure)
               // Update the title in case the new AI run rewrote it
-              wp_update_post([
+              $update_res = wp_update_post([
                   "ID" => $followup_id,
                   "post_title" => $post_title,
               ]);
+
+              if ($update_res === 0) {
+                  error_log("MilePoint: Failed to update follow-up post title for ID " . $followup_id);
+              }
           }
         }
 
@@ -472,7 +491,7 @@ public function handle_chatbot_ingest($request) {
             update_post_meta($followup_id, "_mp_source_thread_id", $thread_id);
             update_post_meta($followup_id, "_mp_source_turn_index", $i);
             update_post_meta($followup_id, "_mp_parent_primary_post_id", $primary_id);
-            update_post_meta($followup_id, "_mp_is_primary_turn", false);
+            update_post_meta($followup_id, "_mp_is_primary_turn", "0");
 
             // Store original data - updating in case the answer streamed more text
             update_post_meta($followup_id, "_mp_original_question", $q_text);
@@ -664,8 +683,8 @@ public function handle_chatbot_ingest($request) {
         ],
         [
           "key" => "_mp_is_primary_turn",
-          "value" => "1", // Look for the primary flag
-          "compare" => "EXISTS" // Backwards compatibility for now, but ideally we'd look for true
+          "value" => "1", // Explicitly require the "1" string
+          "compare" => "="
         ]
       ],
       "posts_per_page" => 1,

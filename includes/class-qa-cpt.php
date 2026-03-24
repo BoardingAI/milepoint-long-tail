@@ -21,7 +21,6 @@ class MP_QA_CPT_Handler
     // Admin Columns
     add_filter("manage_milepoint_qa_posts_columns", [$this, "set_custom_columns"]);
     add_action("manage_milepoint_qa_posts_custom_column", [$this, "custom_column_data"], 10, 2);
-    add_filter("manage_edit-milepoint_qa_sortable_columns", [$this, "sortable_columns"]);
     add_action("restrict_manage_posts", [$this, "add_taxonomy_filters"]);
 
     // Metaboxes
@@ -118,13 +117,6 @@ class MP_QA_CPT_Handler
         }
         break;
     }
-  }
-
-  public function sortable_columns($columns) {
-    $columns["mp_workflow_bucket"] = "mp_workflow_bucket";
-    $columns["mp_turn_index"] = "mp_turn_index";
-    $columns["mp_type"] = "mp_type";
-    return $columns;
   }
 
   public function add_metaboxes() {
