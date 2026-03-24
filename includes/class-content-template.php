@@ -99,154 +99,88 @@ class MP_Content_Template
       return $content;
     }
 
-    $transcript = get_post_meta(get_the_ID(), "_raw_transcript", true);
-    $related = get_post_meta(get_the_ID(), "_related_suggestions", true);
-    $breakdown_data = get_post_meta(get_the_ID(), "_breakdown", true);
-    // Removed unused $post_title
+    $post_id = get_the_ID();
+    $single_turn = get_post_meta($post_id, "_mp_single_turn_content", true);
 
-    if (!is_array($transcript)) {
-      return $content;
+    // Fallback for older posts that might not have single_turn_content yet
+    if (empty($single_turn)) {
+      $transcript = get_post_meta($post_id, "_raw_transcript", true);
+      if (is_array($transcript) && !empty($transcript)) {
+          $single_turn = $transcript[0]; // just take the first turn
+      } else {
+          return $content;
+      }
     }
 
-    // fix hierarchy and style sources
+    $related = get_post_meta($post_id, "_related_suggestions", true);
+    $breakdown_data = get_post_meta($post_id, "_breakdown", true);
+    $is_primary_meta = get_post_meta($post_id, "_mp_is_primary_turn", true);
+    $is_primary = $is_primary_meta === '' || !empty($is_primary_meta); // Handle empty (legacy) or true cases as primary
 
     $html = '<div id="mp-hover-card"></div>';
-
     $html .= '<div class="mp-qa-container">';
-    // let's add the content as a json object so we can inspect it later
-    $html .=
-      '<script type="application/json" id="mp-qa-content">' .
-      json_encode($transcript) .
-      "</script>";
 
-      // includes/class-content-template.php
-    $index = 0;
-    foreach ($transcript as $item) {
-      $question = $this->clean_lit_comments($item["question"]);
-      $answer = $this->clean_lit_comments($item["answer"]);
-      $sources = isset($item["sources"]) ? $item["sources"] : [];
+    $question = $this->clean_lit_comments($single_turn["question"] ?? "");
+    $answer = $this->clean_lit_comments($single_turn["answer"] ?? "");
+    $sources = $single_turn["sources"] ?? [];
 
-      $html .= '<div class="mp-qa-row">';
+    $html .= '<div class="mp-qa-row">';
 
-      // MAIN HEADER: The Question
-      // Skip the first H2 because it duplicates the main H1 title
-      if (is_singular('milepoint_qa') && $index > 0) {
-        // ID for anchor linking (schema)
-        $q_id = 'mp-q-' . $index;
+    // No need to output H2 for the single turn since the title is already the H1.
+    // However, if the user explicitly wants an H2, we could add it.
+    // The previous logic skipped H2 for index 0 (which is the single turn).
 
-        $html .=
-          '  <h2 id="' . esc_attr($q_id) . '" class="mp-q">' .
-         esc_html($question) .
-          "</h2>";
-      }
+    // Breakdown bars (only show for primary turn, or all if preferred, we'll keep it to all if data exists)
+    if (!empty($breakdown_data) && is_singular('milepoint_qa') && $is_primary) {
+      $html .= '<div class="mp-attribution-wrapper">';
+      foreach ($breakdown_data as $bd_index => $bd_item) {
+        $color_index = $bd_index % 4;
+        $raw_percentage = isset($bd_item["percentage"]) ? (float) $bd_item["percentage"] : 0.0;
+        $clamped_percentage = max(0, min(100, $raw_percentage));
+        $width = $clamped_percentage . "%";
 
-      // is there a way to skip this section in hub cards?
-      if (!empty($breakdown_data) && is_singular('milepoint_qa')) {
-        // Main container for the whole bar system
-        $html .= '<div class="mp-attribution-wrapper">';
-
-        foreach ($breakdown_data as $bd_index => $bd_item) {
-          $color_index = $bd_index % 4; // Using modulus 4 to cycle through 4 color variants
-          $raw_percentage = isset($bd_item["percentage"]) ? (float) $bd_item["percentage"] : 0.0;
-          $clamped_percentage = max(0, min(100, $raw_percentage));
-          $width = $clamped_percentage . "%";
-
-          $html .=
-            '<div class="mp-breakdown-segment" style="width: ' . esc_attr($width) . ';">';
-
-          // 1. THE COLORED BAR PIECE
-          $html .=
-            '<div class="mp-breakdown-bar mp-bar-color-' . $color_index . '"></div>';
-
-          // 2. THE LABEL
-          $html .=
-            '<div class="mp-breakdown-label">';
-          $html .=
-            '<strong class="mp-breakdown-percentage mp-text-color-' . $color_index . '">' .
-            esc_html($bd_item["percentage"]) .
-            "%</strong> ";
-          $html .=
-            '<span class="mp-breakdown-source">' .
-            esc_html($bd_item["source"]) .
-            "</span>";
-          $html .= "</div>";
-
-          $html .= "</div>"; // Close segment column
-        }
-
-        $html .= "</div>"; // Close Wrapper
-      }
-
-      // ANSWER BOX
-      // ID for anchor linking (schema)
-      $a_id = 'mp-a-' . $index;
-
-      $html .=
-        '  <div id="' . esc_attr($a_id) . '" class="mp-a">';
-      $html .= $answer;
-      $html .= "  </div>"; // Close Answer Box
-
-      // Sources carousel
-      // TODO: Rewrite to use captured favicon / source (no google favicon hack)
-      if (!empty($sources)) {
-        $html .= '<div class="mp-sources-wrapper">';
-        foreach ($sources as $source) {
-          // Defensive guard: Ensure required keys exist
-          if (!isset($source["url"]) || !isset($source["title"])) {
-            continue;
-          }
-          $original_url = $source["url"];
-          // Resolve the real URL for display purposes (favicons, hostname)
-          $real_url = $this->resolve_source_url($original_url);
-
-          $host = $this->get_hostname($real_url);
-          $favicon =
-            "https://www.google.com/s2/favicons?domain=" . $host . "&sz=32";
-
-          // Note: We still link to the original URL (which might be the redirect)
-          // unless the requirement is to bypass the redirect link entirely.
-          // Usually keeping the tracking link is preferred, but for display we want the real info.
-          // If the user wants the link to be direct, we can change href to $real_url.
-          // Assuming for now they just want the *display* fixed as per "where the source name should be... must always be showing the destination source"
-
-          $html .=
-            '<a class="mp-source-card" href="' .
-            esc_url($original_url) .
-            '" target="_blank" rel="noopener noreferrer">';
-
-          // Header with Icon + Site Name
-          $html .= '  <div class="mp-source-header">';
-          $html .=
-            '    <img src="' .
-            esc_url($favicon) .
-            '" class="mp-source-icon" alt="">';
-          $html .=
-            '    <span class="mp-source-site-name">' .
-            esc_html($host) .
-            "</span>";
-          $html .= "  </div>";
-
-          // Title
-          $html .=
-            '  <div class="mp-source-title">' .
-            esc_html($source["title"]) .
-            "</div>";
-
-          // Excerpt
-          if (!empty($source["excerpt"])) {
-            $html .=
-              '  <div class="mp-source-excerpt">' .
-              esc_html($source["excerpt"]) .
-              "</div>";
-          }
-          $html .= "</a>";
-        }
+        $html .= '<div class="mp-breakdown-segment" style="width: ' . esc_attr($width) . ';">';
+        $html .= '<div class="mp-breakdown-bar mp-bar-color-' . $color_index . '"></div>';
+        $html .= '<div class="mp-breakdown-label">';
+        $html .= '<strong class="mp-breakdown-percentage mp-text-color-' . $color_index . '">' . esc_html($bd_item["percentage"]) . '%</strong> ';
+        $html .= '<span class="mp-breakdown-source">' . esc_html($bd_item["source"]) . "</span>";
         $html .= "</div>";
+        $html .= "</div>"; // Close segment column
       }
-
-      $html .= "</div>"; // Close Row
-      $index++;
+      $html .= "</div>"; // Close Wrapper
     }
+
+    // ANSWER BOX
+    $html .= '  <div id="mp-a-0" class="mp-a">';
+    $html .= $answer;
+    $html .= "  </div>"; // Close Answer Box
+
+    // Sources carousel
+    if (!empty($sources)) {
+      $html .= '<div class="mp-sources-wrapper">';
+      foreach ($sources as $source) {
+        if (!isset($source["url"]) || !isset($source["title"])) continue;
+
+        $original_url = $source["url"];
+        $real_url = $this->resolve_source_url($original_url);
+        $host = $this->get_hostname($real_url);
+        $favicon = "https://www.google.com/s2/favicons?domain=" . $host . "&sz=32";
+
+        $html .= '<a class="mp-source-card" href="' . esc_url($original_url) . '" target="_blank" rel="noopener noreferrer">';
+        $html .= '  <div class="mp-source-header">';
+        $html .= '    <img src="' . esc_url($favicon) . '" class="mp-source-icon" alt="">';
+        $html .= '    <span class="mp-source-site-name">' . esc_html($host) . "</span>";
+        $html .= "  </div>";
+        $html .= '  <div class="mp-source-title">' . esc_html($source["title"]) . "</div>";
+        if (!empty($source["excerpt"])) {
+          $html .= '  <div class="mp-source-excerpt">' . esc_html($source["excerpt"]) . "</div>";
+        }
+        $html .= "</a>";
+      }
+      $html .= "</div>";
+    }
+
+    $html .= "</div>"; // Close Row
 
     // Related Questions
     if (!empty($related) && is_array($related)) {
