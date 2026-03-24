@@ -407,7 +407,8 @@ public function handle_chatbot_ingest($request) {
         $rewrite_failed = false;
 
         if ($api_key && $needs_ai) {
-           $ai_res = $this->get_ai_classification($api_key, $first_question_text, $prior_context, wp_strip_all_tags($q_text), wp_strip_all_tags($a_text));
+           $ai_handler = new MP_AI_Handler();
+           $ai_res = $ai_handler->get_followup_classification($api_key, $first_question_text, $prior_context, wp_strip_all_tags($q_text), wp_strip_all_tags($a_text));
            if ($ai_res && isset($ai_res['classification'])) {
              $classification = $ai_res['classification'];
              $reason = $ai_res['reason'] ?? '';
@@ -464,8 +465,18 @@ public function handle_chatbot_ingest($request) {
                 if ($rewritten_a) update_post_meta($followup_id, "_mp_rewritten_answer", $rewritten_a);
                 if ($reason) update_post_meta($followup_id, "_mp_classification_reason", $reason);
                 if ($confidence) update_post_meta($followup_id, "_mp_classification_confidence", $confidence);
-                if ($classification_failed) update_post_meta($followup_id, "_mp_classification_failed", true);
-                if ($rewrite_failed) update_post_meta($followup_id, "_mp_rewrite_failed", true);
+
+                if ($classification_failed) {
+                    update_post_meta($followup_id, "_mp_classification_failed", true);
+                } else {
+                    delete_post_meta($followup_id, "_mp_classification_failed");
+                }
+
+                if ($rewrite_failed) {
+                    update_post_meta($followup_id, "_mp_rewrite_failed", true);
+                } else {
+                    delete_post_meta($followup_id, "_mp_rewrite_failed");
+                }
 
                 $single_turn = [
                   "question" => $rewritten_q ?: $q_text,
@@ -593,65 +604,6 @@ public function handle_chatbot_ingest($request) {
   }
 
 
-  private function get_ai_classification($api_key, $first_question, $prior_context, $current_question, $current_answer) {
-    $prompt = "You are an expert editorial assistant.
-Your task is to evaluate a follow-up question in a Q&A session.
-
-FIRST QUESTION:
-{$first_question}
-
-PRIOR SESSION CONTEXT:
-{$prior_context}
-
-FOLLOW-UP QUESTION TO EVALUATE:
-{$current_question}
-
-AI ANSWER TO FOLLOW-UP:
-{$current_answer}
-
-INSTRUCTIONS:
-1. Classify the follow-up question into ONE of three buckets: 'ready_as_is', 'needs_rewrite_review', or 'hold'.
-   - 'ready_as_is': The question stands alone cleanly without needing prior context.
-   - 'needs_rewrite_review': The question is valuable but needs prior context injected to stand alone.
-   - 'hold': The question is too vague, conversational, duplicate, or requires guessing.
-2. If 'needs_rewrite_review', provide a 'rewritten_question' that preserves intent but stands alone. Also provide a 'rewritten_answer' that is faithful to the original but makes sense with the rewritten question.
-3. Return ONLY a JSON object with keys:
-   - classification (string)
-   - reason (string)
-   - confidence (string: high/medium/low)
-   - rewritten_question (string, only if needs_rewrite_review, otherwise empty string)
-   - rewritten_answer (string, only if needs_rewrite_review, otherwise empty string)";
-
-    $response = wp_remote_post('https://api.openai.com/v1/chat/completions', [
-      'headers' => [
-        'Authorization' => 'Bearer ' . $api_key,
-        'Content-Type'  => 'application/json',
-      ],
-      'timeout' => 20,
-      'body'    => wp_json_encode([
-        'model' => 'gpt-4o-mini',
-        'temperature' => 0.4,
-        'messages' => [['role' => 'user', 'content' => $prompt]],
-        'response_format' => ['type' => 'json_object']
-      ])
-    ]);
-
-    if (is_wp_error($response)) {
-      return false;
-    }
-
-    $body = json_decode(wp_remote_retrieve_body($response), true);
-    if (!is_array($body) || empty($body['choices'][0]['message']['content'])) {
-      return false;
-    }
-
-    $data = json_decode($body['choices'][0]['message']['content'], true);
-    if (!is_array($data)) {
-        return false;
-    }
-
-    return $data;
-  }
 
   private function get_followup_post_id($thread_id, $turn_index) {
     if (empty($thread_id) || $thread_id === "unknown") return false;
