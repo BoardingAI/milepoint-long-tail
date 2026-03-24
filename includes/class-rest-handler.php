@@ -388,10 +388,8 @@ public function handle_chatbot_ingest($request) {
       // Check if follow-up post already exists
       $followup_id = $this->get_followup_post_id($thread_id, $i);
 
-      if (!$followup_id || (isset($turn['is_streaming']) && $turn['is_streaming'] === false)) {
-        // We re-evaluate if it's new, OR we can implement update logic here if desired.
-        // For simplicity and to avoid unnecessary OpenAI calls, we'll only run AI if it's a new post.
-        // If it exists, we will update the text but keep the same bucket unless it was 'hold' due to failure.
+      // Only process if it doesn't exist OR if streaming has just finished (or no streaming flag provided, assume legacy and update)
+      if (!$followup_id || !isset($turn['is_streaming']) || $turn['is_streaming'] === false) {
 
         $needs_ai = false;
         if (!$followup_id) {
@@ -420,8 +418,14 @@ public function handle_chatbot_ingest($request) {
              $reason = $ai_res['reason'] ?? '';
              $confidence = $ai_res['confidence'] ?? '';
              if ($classification === 'needs_rewrite_review') {
-                 $rewritten_q = $ai_res['rewritten_question'] ?? '';
-                 $rewritten_a = $ai_res['rewritten_answer'] ?? '';
+                 // Clean AI output immediately
+                 $rewritten_q = sanitize_text_field($ai_res['rewritten_question'] ?? '');
+
+                 // Pre-clean and sanitize rewritten answer similarly to normal content
+                 $has_been_cleaned_ai = false;
+                 $clean_ai_answer = $this->pre_clean_html($ai_res['rewritten_answer'] ?? '', $has_been_cleaned_ai);
+                 $rewritten_a = wp_kses_post($clean_ai_answer);
+
                  if (empty($rewritten_q)) {
                      $rewrite_failed = true;
                      $classification = "hold";
@@ -430,32 +434,41 @@ public function handle_chatbot_ingest($request) {
            } else {
              $classification_failed = true;
            }
-        } else {
+        } elseif (!$api_key && $needs_ai) {
            $classification_failed = true;
         }
 
-        // Determine title
+        // Handle Post Creation vs Updating Failed Post
         if ($needs_ai) {
           $post_title = wp_strip_all_tags($q_text);
           if ($classification === 'needs_rewrite_review' && !empty($rewritten_q)) {
               $post_title = wp_strip_all_tags($rewritten_q);
           }
 
-          // Create the post
-          $new_id = wp_insert_post([
-            "post_title" => $post_title,
-            "post_content" => "<!-- MILEPOINT_LONG_TAIL -->",
-            "post_status" => "draft", // Always non-public
-            "post_type" => "milepoint_qa",
-          ]);
-          $followup_id = (!is_wp_error($new_id) && !empty($new_id)) ? $new_id : false;
+          if (!$followup_id) {
+              // Create the new post
+              $new_id = wp_insert_post([
+                "post_title" => $post_title,
+                "post_content" => "<!-- MILEPOINT_LONG_TAIL -->",
+                "post_status" => "draft", // Always non-public
+                "post_type" => "milepoint_qa",
+              ]);
+              $followup_id = (!is_wp_error($new_id) && !empty($new_id)) ? $new_id : false;
+          } else {
+              // The post already exists but we just successfully re-ran AI on it (recovery from failure)
+              // Update the title in case the new AI run rewrote it
+              wp_update_post([
+                  "ID" => $followup_id,
+                  "post_title" => $post_title,
+              ]);
+          }
         }
 
         if ($followup_id) {
             // Set bucket taxonomy (only update if we ran AI)
             if ($needs_ai) wp_set_object_terms($followup_id, $classification, "mp_workflow_status");
 
-            // Store relationship meta
+            // Store relationship meta (safe to overwrite)
             update_post_meta($followup_id, "_mp_source_thread_id", $thread_id);
             update_post_meta($followup_id, "_mp_source_turn_index", $i);
             update_post_meta($followup_id, "_mp_parent_primary_post_id", $primary_id);
