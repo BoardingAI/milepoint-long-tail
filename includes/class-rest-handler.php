@@ -250,11 +250,17 @@ public function handle_chatbot_ingest($request) {
       // Filter out null values from incomplete entries
       $sources = array_filter($sources);
 
-      return [
+      $mapped = [
         "question" => wp_kses_post($clean_question),
         "answer" => wp_kses_post($clean_answer),
         "sources" => $sources, // <--- This allows it to be saved to Post Meta
       ];
+
+      if (isset($item['is_streaming'])) {
+          $mapped['is_streaming'] = (bool) $item['is_streaming'];
+      }
+
+      return $mapped;
     }, $params["full_transcript"] ?? []);
 
     // Fix: Sanitize each related suggestion individually
