@@ -113,7 +113,9 @@ class MP_Content_Template
     }
 
     $related = get_post_meta($post_id, "_related_suggestions", true);
-    $breakdown_data = get_post_meta($post_id, "_breakdown", true);
+    // Prefer turn-specific breakdown if available, fallback to legacy global meta
+    $breakdown_data = !empty($single_turn["breakdown"]) ? $single_turn["breakdown"] : get_post_meta($post_id, "_breakdown", true);
+
     $is_primary_meta = get_post_meta($post_id, "_mp_is_primary_turn", true);
     $is_primary = $is_primary_meta === '' || $is_primary_meta === "1"; // Handle empty (legacy) or explicitly "1" as primary
 
@@ -133,8 +135,8 @@ class MP_Content_Template
     // However, if the user explicitly wants an H2, we could add it.
     // The previous logic skipped H2 for index 0 (which is the single turn).
 
-    // Breakdown bars (only show for primary turn, or all if preferred, we'll keep it to all if data exists)
-    if (!empty($breakdown_data) && is_singular('milepoint_qa') && $is_primary) {
+    // Breakdown bars: render for any post (primary or follow-up) if breakdown data exists
+    if (!empty($breakdown_data) && is_singular('milepoint_qa')) {
       $html .= '<div class="mp-attribution-wrapper">';
       foreach ($breakdown_data as $bd_index => $bd_item) {
         $color_index = $bd_index % 4;

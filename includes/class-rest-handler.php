@@ -256,6 +256,10 @@ public function handle_chatbot_ingest($request) {
         "sources" => $sources, // <--- This allows it to be saved to Post Meta
       ];
 
+      if (isset($item["breakdown"]) && is_array($item["breakdown"])) {
+          $mapped["breakdown"] = $item["breakdown"];
+      }
+
       if (isset($item['is_streaming'])) {
           $mapped['is_streaming'] = (bool) $item['is_streaming'];
       }
@@ -360,6 +364,7 @@ public function handle_chatbot_ingest($request) {
       "question" => $transcript[0]["question"] ?? "",
       "answer" => $transcript[0]["answer"] ?? "",
       "sources" => $transcript[0]["sources"] ?? [],
+      "breakdown" => $transcript[0]["breakdown"] ?? $breakdown, // fallback to overall breakdown if missing per-turn
       "is_rewritten" => false
     ];
     update_post_meta($primary_id, "_mp_single_turn_content", $primary_single_turn);
@@ -520,6 +525,7 @@ public function handle_chatbot_ingest($request) {
                   "question" => $rewritten_q ?: $q_text,
                   "answer" => $rewritten_a ?: $a_text,
                   "sources" => $turn["sources"] ?? [],
+                  "breakdown" => $turn["breakdown"] ?? [],
                   "is_rewritten" => !empty($rewritten_q)
                 ];
                 update_post_meta($followup_id, "_mp_single_turn_content", $single_turn);
@@ -530,6 +536,9 @@ public function handle_chatbot_ingest($request) {
                 if (is_array($existing_single) && empty($existing_single["is_rewritten"])) {
                     $existing_single["answer"] = $a_text;
                     $existing_single["sources"] = $turn["sources"] ?? [];
+                    if (isset($turn["breakdown"])) {
+                        $existing_single["breakdown"] = $turn["breakdown"];
+                    }
                     update_post_meta($followup_id, "_mp_single_turn_content", $existing_single);
                 }
             }
