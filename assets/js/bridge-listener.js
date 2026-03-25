@@ -2,9 +2,47 @@
  * MilePoint Long-Tail Bridge - Clean Polling Version
  */
 // assets/js/bridge-listener.js
+// Safe extraction that avoids assumptions about shadow vs light DOM hierarchy
+const findElementForBlock = (block, selector) => {
+  if (!block) return null;
+
+  // 1. Try light DOM inside block
+  let el = block.querySelector(selector);
+  if (el) return el;
+
+  // 2. Try inside gist-chat-response shadow DOM
+  const responseWidget = block.querySelector("gist-chat-response");
+  if (responseWidget && responseWidget.shadowRoot) {
+    el = responseWidget.shadowRoot.querySelector(selector);
+    if (el) return el;
+  }
+
+  // 3. Try adjacent siblings (e.g. if it renders after the .qa-block)
+  let next = block.nextElementSibling;
+  while (next && (!next.classList || !next.classList.contains("qa-block"))) {
+    if (next.matches && next.matches(selector)) return next;
+    if (next.querySelector) {
+      el = next.querySelector(selector);
+      if (el) return el;
+    }
+    if (next.shadowRoot) {
+      el = next.shadowRoot.querySelector(selector);
+      if (el) return el;
+    }
+    next = next.nextElementSibling;
+  }
+
+  return null;
+};
+
 function getBreakdownFromElement(containerElement) {
   if (!containerElement) return [];
-  const attributionBar = containerElement.querySelector("gist-attribution-bar");
+
+  // Use the robust finder to locate the attribution bar relative to the container
+  const attributionBar = containerElement.classList?.contains("qa-block")
+      ? findElementForBlock(containerElement, "gist-attribution-bar")
+      : containerElement.querySelector("gist-attribution-bar");
+
   let breakdown = [];
   if (attributionBar && attributionBar.shadowRoot) {
     const columns = attributionBar.shadowRoot.querySelectorAll(".col");
@@ -114,7 +152,8 @@ function getDeepFlattenedClone(node) {
       }
 
       // 3. Capture Citations/Sources (from Carousel Shadow DOM)
-      const carousel = block.querySelector("gist-citation-carousel");
+      // Use robust finder in case carousel moved to sibling or shadow DOM
+      const carousel = findElementForBlock(block, "gist-citation-carousel");
       let sources = [];
       if (carousel?.shadowRoot) {
         const cards = carousel.shadowRoot.querySelectorAll(
