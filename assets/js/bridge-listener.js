@@ -2,26 +2,19 @@
  * MilePoint Long-Tail Bridge - Clean Polling Version
  */
 // assets/js/bridge-listener.js
-function getBreakdown() {
-  const widget = document.querySelector("gist-chat-widget");
-  const shadow = widget?.shadowRoot;
-  if (!shadow) return;
-
-  const attributionBar = shadow.querySelector("gist-attribution-bar");
+function getBreakdownFromElement(containerElement) {
+  if (!containerElement) return [];
+  const attributionBar = containerElement.querySelector("gist-attribution-bar");
   let breakdown = [];
   if (attributionBar && attributionBar.shadowRoot) {
-    // Query inside the shadow root for each column
     const columns = attributionBar.shadowRoot.querySelectorAll(".col");
 
     breakdown = Array.from(columns).map((col) => {
       const labelSpan = col.querySelector(".label");
       if (!labelSpan) return null;
 
-      // The percentage is inside the <b> tag
       const percentage = labelSpan.querySelector("b")?.innerText.trim() || "";
 
-      // The source name is the text node after the <b> tag
-      // We clone the node and remove the <b> to get just the clean source name
       const labelClone = labelSpan.cloneNode(true);
       const bTag = labelClone.querySelector("b");
       if (bTag) bTag.remove();
@@ -32,10 +25,14 @@ function getBreakdown() {
         percentage: Number(percentage.replace("%", "") || 0),
       };
     }).filter(Boolean);
-  } else {
-    console.log("Attribution bar or Shadow Root not found.");
   }
   return breakdown;
+}
+
+// Keep the global fallback for legacy top-level payload structure if needed
+function getBreakdown() {
+  const widget = document.querySelector("gist-chat-widget");
+  return getBreakdownFromElement(widget?.shadowRoot);
 }
 
 function getDeepFlattenedClone(node) {
@@ -139,7 +136,10 @@ function getDeepFlattenedClone(node) {
         }));
       }
 
-      return { question, answer, sources };
+      // 4. Capture turn-specific attribution breakdown
+      const breakdown = getBreakdownFromElement(block);
+
+      return { question, answer, sources, breakdown };
     });
   };
 
