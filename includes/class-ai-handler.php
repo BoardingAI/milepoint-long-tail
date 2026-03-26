@@ -168,9 +168,36 @@ AI ANSWER TO FOLLOW-UP:
 
 INSTRUCTIONS:
 1. Classify the follow-up question into ONE of three buckets: 'ready_as_is', 'context_added', or 'hold'.
-   - 'ready_as_is': The question stands alone cleanly without needing prior context.
-   - 'context_added': The question is valuable but needs prior context injected to stand alone.
-   - 'hold': The question is too vague, conversational, duplicate, or requires guessing.
+
+   CRITICAL CLASSIFICATION RULE:
+   A follow-up is ONLY 'ready_as_is' if it already works as a fully standalone public question with NO missing referent, NO unresolved dependency on prior turns, and NO need for additional session context to understand what is being asked. If a normal reader landing directly on that question page would have to guess what the user meant, it must be 'context_added'.
+
+   STRICTLY CLASSIFY AS 'context_added' IF the question contains:
+   - Unresolved pronouns or referents (e.g., it, they, that, this, these, those, there, here, them, one, ones).
+   - Shorthand, elliptical phrasing, or comparisons that do not restate both sides clearly.
+   - Implied subjects, locations, or timeframes carried over from earlier turns.
+   - \"What about...\", \"How about...\", \"Which one...\", \"Is that better...\", \"What is the best one...\" where the object is not fully restated.
+
+   EXAMPLES OF 'context_added':
+   - \"What about shopping there?\"
+   - \"Is that one better?\"
+   - \"How does that compare?\"
+   - \"What about lounges?\"
+   - \"Would that still be worth it?\"
+   - \"What about for business class travelers?\"
+   - \"Is it good for families?\"
+   - \"How about in Tokyo instead?\"
+   - \"Which one is cheapest?\"
+   - \"What is the best one there?\"
+
+   EXAMPLES OF 'ready_as_is':
+   - \"Which Singapore hotels are best for shopping on Orchard Road?\"
+   - \"What are the best lounges in Doha for business class travelers?\"
+   - \"Which Hyatt properties in Tokyo offer the best value on points?\"
+   - \"What is the best credit card for frequent international travelers?\"
+
+   - 'hold': The question is too vague, purely conversational filler, duplicate, or requires completely blind guessing.
+
 2. If 'context_added', provide a 'rewritten_question' that preserves intent but stands alone. DO NOT rewrite the answer.
 3. Return ONLY a JSON object with keys:
    - classification (string)
