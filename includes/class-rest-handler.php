@@ -9,6 +9,12 @@ if (!defined("ABSPATH")) {
 
 class MP_REST_Handler
 {
+  // AI Safeguard Thresholds
+  const MAX_AI_FOLLOWUPS_PER_SESSION = 5; // Max follow-ups to run AI on per thread
+  const MAX_CONTEXT_TURNS = 2; // Max previous turns to include in the context prompt
+  const MIN_WORD_COUNT = 3; // Minimum word count for a follow-up question to justify AI triage
+  const AI_COOLDOWN_SECONDS = 30; // Minimum time between AI attempts for the same turn (debounce/cooldown)
+
   /**
    * Register the REST API route
    */
