@@ -494,7 +494,7 @@ public function handle_chatbot_ingest($request) {
 
          if ($ai_res && isset($ai_res['classification'])) {
            $classification = $ai_res['classification'];
-           $allowed_buckets = ['ready_as_is', 'needs_rewrite_review', 'hold'];
+           $allowed_buckets = ['ready_as_is', 'context_added', 'hold'];
            if (!in_array($classification, $allowed_buckets)) {
                error_log("MilePoint: AI returned unsupported bucket: " . $classification . ". Falling back to hold.");
                $classification = "hold";
@@ -505,7 +505,7 @@ public function handle_chatbot_ingest($request) {
            $reason = $ai_res['reason'] ?? '';
            $confidence = $ai_res['confidence'] ?? '';
 
-           if ($classification === 'needs_rewrite_review') {
+           if ($classification === 'context_added') {
                $rewritten_q = sanitize_text_field($ai_res['rewritten_question'] ?? '');
 
                if (empty($rewritten_q)) {
@@ -532,15 +532,29 @@ public function handle_chatbot_ingest($request) {
 
       if ($needs_ai || $skip_ai || !$followup_id) {
         $post_title = wp_strip_all_tags($q_text);
-        if ($classification === 'needs_rewrite_review' && !empty($rewritten_q)) {
+        if ($classification === 'context_added' && !empty($rewritten_q)) {
             $post_title = wp_strip_all_tags($rewritten_q);
+        }
+
+        // Auto-schedule eligible follow-ups matching primary behavior
+        $publish_status = 'draft';
+        $post_date = current_time('mysql');
+        $post_date_gmt = current_time('mysql', 1);
+
+        if ($classification === 'ready_as_is' || $classification === 'context_added') {
+            $future_ts_gmt = current_time("timestamp", true) + DAY_IN_SECONDS;
+            $post_date_gmt = gmdate("Y-m-d H:i:s", $future_ts_gmt);
+            $post_date = get_date_from_gmt($post_date_gmt);
+            $publish_status = $has_pollution ? "draft" : "future";
         }
 
         if (!$followup_id) {
             $new_id = wp_insert_post([
               "post_title" => $post_title,
               "post_content" => "<!-- MILEPOINT_LONG_TAIL -->",
-              "post_status" => "draft",
+              "post_status" => $publish_status,
+              "post_date" => $post_date,
+              "post_date_gmt" => $post_date_gmt,
               "post_type" => "milepoint_qa",
             ]);
 
@@ -551,10 +565,24 @@ public function handle_chatbot_ingest($request) {
                 $followup_id = $new_id;
             }
         } else {
-            $update_res = wp_update_post([
+            $update_args = [
                 "ID" => $followup_id,
                 "post_title" => $post_title,
-            ]);
+            ];
+
+            // Only update schedule if it's currently a draft transitioning to a scheduled post,
+            // or if we are actively re-scheduling it (avoid resetting manual edits).
+            // For safety, we enforce the new status if it was previously held/failed.
+            if ($classification === 'ready_as_is' || $classification === 'context_added') {
+                $current_status = get_post_status($followup_id);
+                if ($current_status === 'draft') {
+                    $update_args["post_status"] = $publish_status;
+                    $update_args["post_date"] = $post_date;
+                    $update_args["post_date_gmt"] = $post_date_gmt;
+                }
+            }
+
+            $update_res = wp_update_post($update_args);
             if ($update_res === 0) {
                 error_log("MilePoint: Failed to update follow-up post title for ID " . $followup_id);
             }

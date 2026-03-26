@@ -69,7 +69,6 @@ class MP_QA_CPT_Handler
         $new_columns["mp_source_thread"] = "Source Thread";
         $new_columns["mp_turn_index"] = "Turn";
         $new_columns["mp_type"] = "Type";
-        $new_columns["mp_rewritten"] = "Rewritten?";
         $new_columns["mp_original_preview"] = "Original Preview";
       }
       $new_columns[$key] = $title;
@@ -103,10 +102,6 @@ class MP_QA_CPT_Handler
       case "mp_type":
         $is_primary = get_post_meta($post_id, "_mp_is_primary_turn", true);
         echo $is_primary ? "<strong>Primary</strong>" : "Follow-up";
-        break;
-      case "mp_rewritten":
-        $rewritten = get_post_meta($post_id, "_mp_rewritten_question", true);
-        echo $rewritten ? "Yes" : "No";
         break;
       case "mp_original_preview":
         $orig = get_post_meta($post_id, "_mp_original_question", true);
@@ -267,7 +262,7 @@ class MP_QA_CPT_Handler
     $terms = [
       "primary_first_turn" => "Primary First Turn",
       "ready_as_is" => "Ready As Is",
-      "needs_rewrite_review" => "Needs Rewrite Review",
+      "context_added" => "Context Added",
       "hold" => "Hold",
     ];
 
