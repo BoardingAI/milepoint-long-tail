@@ -388,6 +388,9 @@ public function handle_chatbot_ingest($request) {
 
     // Skip index 0 (Primary)
     for ($i = 1; $i < count($transcript); $i++) {
+      // Explicitly initialize the AI budget tracking flag at the start of every iteration
+      $did_consume_ai_budget = false;
+
       $turn = $transcript[$i];
       $q_text = $turn["question"] ?? "";
       $a_text = $turn["answer"] ?? "";
@@ -484,6 +487,10 @@ public function handle_chatbot_ingest($request) {
 
       if ($api_key && $needs_ai && !$skip_ai) {
          $ai_handler = new MP_AI_Handler();
+
+         // Mark that an actual OpenAI request is being attempted
+         $did_consume_ai_budget = true;
+
          $ai_res = $ai_handler->get_followup_classification($api_key, $first_question_text, $prior_context, wp_strip_all_tags($q_text), wp_strip_all_tags($a_text));
 
          if ($ai_res && isset($ai_res['classification'])) {
@@ -522,7 +529,7 @@ public function handle_chatbot_ingest($request) {
 
       if ($needs_ai && !$skip_ai) {
           delete_transient($lock_key);
-          if (!$classification_failed) {
+          if ($did_consume_ai_budget) {
               $ai_processed_count++;
           }
       }
@@ -571,8 +578,8 @@ public function handle_chatbot_ingest($request) {
                wp_set_object_terms($followup_id, $classification, "mp_workflow_status");
           }
 
-          // Persist actual AI budget consumption flag
-          if ($did_consume_ai_budget && !$classification_failed) {
+          // Explicitly record that AI budget was consumed for this turn, even if the API call failed
+          if ($did_consume_ai_budget) {
               update_post_meta($followup_id, "_mp_ai_reviewed", "1");
           }
 
