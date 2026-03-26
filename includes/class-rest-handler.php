@@ -10,10 +10,10 @@ if (!defined("ABSPATH")) {
 class MP_REST_Handler
 {
   // AI Safeguard Thresholds
-  const MAX_AI_FOLLOWUPS_PER_SESSION = 5; // Max follow-ups to run AI on per thread
-  const MAX_CONTEXT_TURNS = 2; // Max previous turns to include in the context prompt
-  const MIN_WORD_COUNT = 3; // Minimum word count for a follow-up question to justify AI triage
-  const AI_COOLDOWN_SECONDS = 30; // Minimum time between AI attempts for the same turn (debounce/cooldown)
+  const MAX_AI_FOLLOWUPS_PER_SESSION = 5;
+  const MAX_CONTEXT_TURNS = 2;
+  const MIN_WORD_COUNT = 3;
+  const AI_COOLDOWN_SECONDS = 30;
 
   /**
    * Register the REST API route
@@ -384,175 +384,244 @@ public function handle_chatbot_ingest($request) {
     $prior_context_arr = [];
     $prior_context_arr[] = "Q: " . $first_question_text . "\nA: " . wp_strip_all_tags($first_answer_text);
 
+    $ai_processed_count = 0;
+
     // Skip index 0 (Primary)
     for ($i = 1; $i < count($transcript); $i++) {
       $turn = $transcript[$i];
       $q_text = $turn["question"] ?? "";
       $a_text = $turn["answer"] ?? "";
+      $clean_q = trim(wp_strip_all_tags($q_text));
 
       // We only care about user questions, if it's empty, skip
-      if (empty(trim(wp_strip_all_tags($q_text)))) {
+      if (empty($clean_q)) {
         $prior_context_arr[] = "A: " . wp_strip_all_tags($a_text);
         continue;
       }
 
-      // Check if follow-up post already exists
       $followup_id = $this->get_followup_post_id($thread_id, $i);
 
-      // Only process if it doesn't exist OR if streaming has just finished (or no streaming flag provided, assume legacy and update)
-      if (!$followup_id || !isset($turn['is_streaming']) || $turn['is_streaming'] === false) {
+      if ($followup_id) {
+          $failed_prev = get_post_meta($followup_id, "_mp_classification_failed", true);
+          $is_streaming_prev = get_post_meta($followup_id, "_mp_is_streaming", true);
+          if (!$failed_prev && !$is_streaming_prev && get_post_meta($followup_id, "_mp_workflow_status", true) !== "hold") {
+             $ai_processed_count++;
+          }
+      }
 
-        $needs_ai = false;
-        if (!$followup_id) {
-             $needs_ai = true;
-        } else {
-             // If it exists but failed classification before, try again
-             $failed = get_post_meta($followup_id, "_mp_classification_failed", true);
-             if ($failed) $needs_ai = true;
-        }
+      // --- UNCHANGED CONTENT PROTECTION ---
+      $current_hash = md5($clean_q . trim(wp_strip_all_tags($a_text)));
+      if ($followup_id) {
+          $existing_hash = get_post_meta($followup_id, "_mp_turn_content_hash", true);
+          if ($existing_hash === $current_hash) {
+              $prior_context_arr[] = "Q: " . $clean_q . "\nA: " . wp_strip_all_tags($a_text);
+              continue;
+          }
+      }
 
-        $prior_context = implode("\n\n", $prior_context_arr);
+      $needs_ai = false;
+      $is_currently_streaming = isset($turn['is_streaming']) && $turn['is_streaming'] === true;
 
-        $classification = "hold"; // Default
-        $reason = "";
-        $confidence = "";
-        $rewritten_q = "";
-        $rewritten_a = "";
-        $classification_failed = false;
-        $rewrite_failed = false;
+      if (!$followup_id) {
+          $needs_ai = true;
+      } else {
+          $failed_prev = get_post_meta($followup_id, "_mp_classification_failed", true);
+          $was_streaming_prev = get_post_meta($followup_id, "_mp_is_streaming", true);
 
-        if ($api_key && $needs_ai) {
-           $ai_handler = new MP_AI_Handler();
-           $ai_res = $ai_handler->get_followup_classification($api_key, $first_question_text, $prior_context, wp_strip_all_tags($q_text), wp_strip_all_tags($a_text));
-           if ($ai_res && isset($ai_res['classification'])) {
-             $classification = $ai_res['classification'];
-             // Whitelist output constraints to prevent AI hallucination saving unsupported buckets
-             $allowed_buckets = ['ready_as_is', 'needs_rewrite_review', 'hold'];
-             if (!in_array($classification, $allowed_buckets)) {
-                 error_log("MilePoint: AI returned unsupported bucket: " . $classification . ". Falling back to hold.");
-                 $classification = "hold";
-                 $classification_failed = true;
-             }
+          if ($failed_prev || ($was_streaming_prev && !$is_currently_streaming)) {
+              $needs_ai = true;
+          }
+      }
 
-             $reason = $ai_res['reason'] ?? '';
-             $confidence = $ai_res['confidence'] ?? '';
+      $classification = "hold";
+      $reason = "";
+      $confidence = "";
+      $rewritten_q = "";
+      $rewritten_a = "";
+      $classification_failed = false;
+      $rewrite_failed = false;
+      $skip_ai = false;
+      $lock_key = "mp_ai_lock_{$thread_id}_{$i}";
 
-             if ($classification === 'needs_rewrite_review') {
-                 // Clean AI output immediately
-                 $rewritten_q = sanitize_text_field($ai_res['rewritten_question'] ?? '');
+      if ($needs_ai) {
+          if ($is_currently_streaming) {
+               $skip_ai = true;
+               $reason = "Skipped: Turn is still mid-update (streaming)";
+          }
 
-                 // Pre-clean and sanitize rewritten answer similarly to normal content
-                 $has_been_cleaned_ai = false;
-                 $clean_ai_answer = $this->pre_clean_html($ai_res['rewritten_answer'] ?? '', $has_been_cleaned_ai);
-                 $rewritten_a = wp_kses_post($clean_ai_answer);
+          if (!$skip_ai && get_transient($lock_key)) {
+              $skip_ai = true;
+              $reason = "Skipped: Concurrent processing lock active";
+          }
 
-                 if (empty($rewritten_q)) {
-                     $rewrite_failed = true;
-                     $classification = "hold";
-                 }
-             }
-           } else {
-             $classification_failed = true;
+          $last_attempt = get_transient("mp_ai_cooldown_{$thread_id}_{$i}");
+          if (!$skip_ai && $last_attempt) {
+              $skip_ai = true;
+              $reason = "Skipped: Rapid update cooldown active";
+          }
+
+          if (!$skip_ai && str_word_count($clean_q) < self::MIN_WORD_COUNT) {
+              $skip_ai = true;
+              $reason = "Skipped: Follow-up too short (low signal)";
+          }
+
+          if (!$skip_ai && $ai_processed_count >= self::MAX_AI_FOLLOWUPS_PER_SESSION) {
+              $skip_ai = true;
+              $reason = "Skipped: Max AI follow-ups per session exceeded";
+          }
+
+          if (!$skip_ai && $api_key) {
+              set_transient($lock_key, true, 60);
+              set_transient("mp_ai_cooldown_{$thread_id}_{$i}", true, self::AI_COOLDOWN_SECONDS);
+          }
+      }
+
+      $bounded_context_arr = array_slice($prior_context_arr, -(self::MAX_CONTEXT_TURNS));
+      $prior_context = implode("\n\n", $bounded_context_arr);
+
+      if ($api_key && $needs_ai && !$skip_ai) {
+         $ai_handler = new MP_AI_Handler();
+         $ai_res = $ai_handler->get_followup_classification($api_key, $first_question_text, $prior_context, wp_strip_all_tags($q_text), wp_strip_all_tags($a_text));
+
+         if ($ai_res && isset($ai_res['classification'])) {
+           $classification = $ai_res['classification'];
+           $allowed_buckets = ['ready_as_is', 'needs_rewrite_review', 'hold'];
+           if (!in_array($classification, $allowed_buckets)) {
+               error_log("MilePoint: AI returned unsupported bucket: " . $classification . ". Falling back to hold.");
+               $classification = "hold";
+               $classification_failed = true;
+               $reason = "AI returned invalid bucket (hallucination).";
            }
-        } elseif (!$api_key && $needs_ai) {
+
+           $reason = $ai_res['reason'] ?? '';
+           $confidence = $ai_res['confidence'] ?? '';
+
+           if ($classification === 'needs_rewrite_review') {
+               $rewritten_q = sanitize_text_field($ai_res['rewritten_question'] ?? '');
+               $has_been_cleaned_ai = false;
+               $clean_ai_answer = $this->pre_clean_html($ai_res['rewritten_answer'] ?? '', $has_been_cleaned_ai);
+               $rewritten_a = wp_kses_post($clean_ai_answer);
+
+               if (empty($rewritten_q)) {
+                   $rewrite_failed = true;
+                   $classification = "hold";
+                   $reason = "Rewrite failed or returned empty.";
+               }
+           }
+         } else {
            $classification_failed = true;
+           $reason = "AI request failed or returned invalid JSON.";
+         }
+      } elseif (!$api_key && $needs_ai && !$skip_ai) {
+         $classification_failed = true;
+         $reason = "API Key missing.";
+      }
+
+      if ($needs_ai && !$skip_ai) {
+          delete_transient($lock_key);
+          if (!$classification_failed) {
+              $ai_processed_count++;
+          }
+      }
+
+      if ($needs_ai || $skip_ai || !$followup_id) {
+        $post_title = wp_strip_all_tags($q_text);
+        if ($classification === 'needs_rewrite_review' && !empty($rewritten_q)) {
+            $post_title = wp_strip_all_tags($rewritten_q);
         }
 
-        // Handle Post Creation vs Updating Failed Post
-        if ($needs_ai) {
-          $post_title = wp_strip_all_tags($q_text);
-          if ($classification === 'needs_rewrite_review' && !empty($rewritten_q)) {
-              $post_title = wp_strip_all_tags($rewritten_q);
-          }
+        if (!$followup_id) {
+            $new_id = wp_insert_post([
+              "post_title" => $post_title,
+              "post_content" => "<!-- MILEPOINT_LONG_TAIL -->",
+              "post_status" => "draft",
+              "post_type" => "milepoint_qa",
+            ]);
 
-          if (!$followup_id) {
-              // Create the new post
-              $new_id = wp_insert_post([
-                "post_title" => $post_title,
-                "post_content" => "<!-- MILEPOINT_LONG_TAIL -->",
-                "post_status" => "draft", // Always non-public
-                "post_type" => "milepoint_qa",
-              ]);
-
-              if (is_wp_error($new_id) || empty($new_id)) {
-                  error_log("MilePoint: Failed to insert follow-up post for thread " . $thread_id . " turn " . $i);
-                  $followup_id = false;
-              } else {
-                  $followup_id = $new_id;
-              }
-          } else {
-              // The post already exists but we just successfully re-ran AI on it (recovery from failure)
-              // Update the title in case the new AI run rewrote it
-              $update_res = wp_update_post([
-                  "ID" => $followup_id,
-                  "post_title" => $post_title,
-              ]);
-
-              if ($update_res === 0) {
-                  error_log("MilePoint: Failed to update follow-up post title for ID " . $followup_id);
-              }
-          }
-        }
-
-        if ($followup_id) {
-            // Set bucket taxonomy (only update if we ran AI)
-            if ($needs_ai) wp_set_object_terms($followup_id, $classification, "mp_workflow_status");
-
-            // Store relationship meta (safe to overwrite)
-            update_post_meta($followup_id, "_mp_source_thread_id", $thread_id);
-            update_post_meta($followup_id, "_mp_source_turn_index", $i);
-            update_post_meta($followup_id, "_mp_parent_primary_post_id", $primary_id);
-            update_post_meta($followup_id, "_mp_is_primary_turn", "0");
-
-            // Store original data - updating in case the answer streamed more text
-            update_post_meta($followup_id, "_mp_original_question", $q_text);
-            update_post_meta($followup_id, "_mp_original_answer", $a_text);
-
-            // Store rewritten data if any
-            if ($needs_ai) {
-                if ($rewritten_q) update_post_meta($followup_id, "_mp_rewritten_question", $rewritten_q);
-                if ($rewritten_a) update_post_meta($followup_id, "_mp_rewritten_answer", $rewritten_a);
-                if ($reason) update_post_meta($followup_id, "_mp_classification_reason", $reason);
-                if ($confidence) update_post_meta($followup_id, "_mp_classification_confidence", $confidence);
-
-                if ($classification_failed) {
-                    update_post_meta($followup_id, "_mp_classification_failed", true);
-                } else {
-                    delete_post_meta($followup_id, "_mp_classification_failed");
-                }
-
-                if ($rewrite_failed) {
-                    update_post_meta($followup_id, "_mp_rewrite_failed", true);
-                } else {
-                    delete_post_meta($followup_id, "_mp_rewrite_failed");
-                }
-
-                $single_turn = [
-                  "question" => $rewritten_q ?: $q_text,
-                  "answer" => $rewritten_a ?: $a_text,
-                  "sources" => $turn["sources"] ?? [],
-                  "breakdown" => $turn["breakdown"] ?? [],
-                  "is_rewritten" => !empty($rewritten_q)
-                ];
-                update_post_meta($followup_id, "_mp_single_turn_content", $single_turn);
+            if (is_wp_error($new_id) || empty($new_id)) {
+                error_log("MilePoint: Failed to insert follow-up post for thread " . $thread_id . " turn " . $i);
+                $followup_id = false;
             } else {
-                // Not running AI again, but we should update the original answer in single_turn_content
-                // if it hasn't been rewritten, to capture streamed text
-                $existing_single = get_post_meta($followup_id, "_mp_single_turn_content", true);
-                if (is_array($existing_single) && empty($existing_single["is_rewritten"])) {
-                    $existing_single["answer"] = $a_text;
-                    $existing_single["sources"] = $turn["sources"] ?? [];
-                    if (isset($turn["breakdown"])) {
-                        $existing_single["breakdown"] = $turn["breakdown"];
-                    }
-                    update_post_meta($followup_id, "_mp_single_turn_content", $existing_single);
-                }
+                $followup_id = $new_id;
+            }
+        } else {
+            $update_res = wp_update_post([
+                "ID" => $followup_id,
+                "post_title" => $post_title,
+            ]);
+            if ($update_res === 0) {
+                error_log("MilePoint: Failed to update follow-up post title for ID " . $followup_id);
             }
         }
       }
 
-      $prior_context_arr[] = "Q: " . wp_strip_all_tags($q_text) . "\nA: " . wp_strip_all_tags($a_text);
-    }
+      if ($followup_id) {
+          update_post_meta($followup_id, "_mp_turn_content_hash", $current_hash);
+
+          if ($is_currently_streaming) {
+              update_post_meta($followup_id, "_mp_is_streaming", true);
+          } else {
+              delete_post_meta($followup_id, "_mp_is_streaming");
+          }
+
+          if ($needs_ai || $skip_ai || get_post_meta($followup_id, "_mp_workflow_status", true) === false) {
+               wp_set_object_terms($followup_id, $classification, "mp_workflow_status");
+          }
+
+          update_post_meta($followup_id, "_mp_source_thread_id", $thread_id);
+          update_post_meta($followup_id, "_mp_source_turn_index", $i);
+          update_post_meta($followup_id, "_mp_parent_primary_post_id", $primary_id);
+          update_post_meta($followup_id, "_mp_is_primary_turn", "0");
+
+          update_post_meta($followup_id, "_mp_original_question", $q_text);
+          update_post_meta($followup_id, "_mp_original_answer", $a_text);
+
+          if ($needs_ai || $skip_ai) {
+              if ($rewritten_q) update_post_meta($followup_id, "_mp_rewritten_question", $rewritten_q);
+              if ($rewritten_a) update_post_meta($followup_id, "_mp_rewritten_answer", $rewritten_a);
+
+              if ($reason) {
+                  update_post_meta($followup_id, "_mp_classification_reason", $reason);
+              } else {
+                  delete_post_meta($followup_id, "_mp_classification_reason");
+              }
+
+              if ($confidence) update_post_meta($followup_id, "_mp_classification_confidence", $confidence);
+
+              if ($classification_failed) {
+                  update_post_meta($followup_id, "_mp_classification_failed", true);
+              } else {
+                  delete_post_meta($followup_id, "_mp_classification_failed");
+              }
+
+              if ($rewrite_failed) {
+                  update_post_meta($followup_id, "_mp_rewrite_failed", true);
+              } else {
+                  delete_post_meta($followup_id, "_mp_rewrite_failed");
+              }
+
+              $single_turn = [
+                "question" => $rewritten_q ?: $q_text,
+                "answer" => $rewritten_a ?: $a_text,
+                "sources" => $turn["sources"] ?? [],
+                "breakdown" => $turn["breakdown"] ?? [],
+                "is_rewritten" => !empty($rewritten_q)
+              ];
+              update_post_meta($followup_id, "_mp_single_turn_content", $single_turn);
+          } else {
+              $existing_single = get_post_meta($followup_id, "_mp_single_turn_content", true);
+              if (is_array($existing_single) && empty($existing_single["is_rewritten"])) {
+                  $existing_single["answer"] = $a_text;
+                  $existing_single["sources"] = $turn["sources"] ?? [];
+                  if (isset($turn["breakdown"])) {
+                      $existing_single["breakdown"] = $turn["breakdown"];
+                  }
+                  update_post_meta($followup_id, "_mp_single_turn_content", $existing_single);
+              }
+          }
+      }
+
+      $prior_context_arr[] = "Q: " . $clean_q . "\nA: " . wp_strip_all_tags($a_text);    }
 
     return new WP_REST_Response(
       ["message" => "Post and follow-ups updated with sources.", "primary_id" => $primary_id],
