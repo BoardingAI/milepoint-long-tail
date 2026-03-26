@@ -131,7 +131,7 @@ class MP_QA_CPT_Handler
 
     add_meta_box(
       "mp_rewritten_turn_metabox",
-      "Rewritten Standalone Version",
+      "Rewritten Standalone Question",
       [$this, "render_rewritten_metabox"],
       "milepoint_qa",
       "normal",
@@ -190,18 +190,12 @@ class MP_QA_CPT_Handler
 
   public function render_rewritten_metabox($post) {
     $rewritten_question = get_post_meta($post->ID, "_mp_rewritten_question", true);
-    $rewritten_answer = get_post_meta($post->ID, "_mp_rewritten_answer", true);
 
     echo "<div style='background:#f9f9f9; padding:15px; border:1px solid #ddd;'>";
-    if ($rewritten_question || $rewritten_answer) {
-      if ($rewritten_question) {
-        echo "<h4>Rewritten Question</h4>";
+    if ($rewritten_question) {
+        echo "<h4>Rewritten Standalone Question</h4>";
         echo "<blockquote>" . nl2br(esc_html($rewritten_question)) . "</blockquote>";
-      }
-      if ($rewritten_answer) {
-        echo "<h4>Rewritten Answer</h4>";
-        echo "<blockquote>" . wp_kses_post($rewritten_answer) . "</blockquote>";
-      }
+        echo "<p><em>Note: Only the question is rewritten. The answer body is preserved directly from the original capture.</em></p>";
     } else {
       echo "<p><em>No rewrite was generated for this item.</em></p>";
     }

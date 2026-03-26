@@ -443,7 +443,6 @@ public function handle_chatbot_ingest($request) {
       $reason = "";
       $confidence = "";
       $rewritten_q = "";
-      $rewritten_a = "";
       $classification_failed = false;
       $rewrite_failed = false;
       $skip_ai = false;
@@ -508,9 +507,6 @@ public function handle_chatbot_ingest($request) {
 
            if ($classification === 'needs_rewrite_review') {
                $rewritten_q = sanitize_text_field($ai_res['rewritten_question'] ?? '');
-               $has_been_cleaned_ai = false;
-               $clean_ai_answer = $this->pre_clean_html($ai_res['rewritten_answer'] ?? '', $has_been_cleaned_ai);
-               $rewritten_a = wp_kses_post($clean_ai_answer);
 
                if (empty($rewritten_q)) {
                    $rewrite_failed = true;
@@ -593,7 +589,6 @@ public function handle_chatbot_ingest($request) {
 
           if ($needs_ai || $skip_ai) {
               if ($rewritten_q) update_post_meta($followup_id, "_mp_rewritten_question", $rewritten_q);
-              if ($rewritten_a) update_post_meta($followup_id, "_mp_rewritten_answer", $rewritten_a);
 
               if ($reason) {
                   update_post_meta($followup_id, "_mp_classification_reason", $reason);
@@ -617,7 +612,7 @@ public function handle_chatbot_ingest($request) {
 
               $single_turn = [
                 "question" => $rewritten_q ?: $q_text,
-                "answer" => $rewritten_a ?: $a_text,
+                "answer" => $a_text, // Always use original captured answer
                 "sources" => $turn["sources"] ?? [],
                 "breakdown" => $turn["breakdown"] ?? [],
                 "is_rewritten" => !empty($rewritten_q)
@@ -625,7 +620,9 @@ public function handle_chatbot_ingest($request) {
               update_post_meta($followup_id, "_mp_single_turn_content", $single_turn);
           } else {
               $existing_single = get_post_meta($followup_id, "_mp_single_turn_content", true);
-              if (is_array($existing_single) && empty($existing_single["is_rewritten"])) {
+              if (is_array($existing_single)) {
+                  // We always use the original captured answer, even if the question was rewritten previously.
+                  // We update sources and breakdown to catch streamed arrivals.
                   $existing_single["answer"] = $a_text;
                   $existing_single["sources"] = $turn["sources"] ?? [];
                   if (isset($turn["breakdown"])) {

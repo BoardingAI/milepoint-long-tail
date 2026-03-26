@@ -171,13 +171,12 @@ INSTRUCTIONS:
    - 'ready_as_is': The question stands alone cleanly without needing prior context.
    - 'needs_rewrite_review': The question is valuable but needs prior context injected to stand alone.
    - 'hold': The question is too vague, conversational, duplicate, or requires guessing.
-2. If 'needs_rewrite_review', provide a 'rewritten_question' that preserves intent but stands alone. Also provide a 'rewritten_answer' that is faithful to the original but makes sense with the rewritten question.
+2. If 'needs_rewrite_review', provide a 'rewritten_question' that preserves intent but stands alone. DO NOT rewrite the answer.
 3. Return ONLY a JSON object with keys:
    - classification (string)
    - reason (string)
    - confidence (string: high/medium/low)
-   - rewritten_question (string, only if needs_rewrite_review, otherwise empty string)
-   - rewritten_answer (string, only if needs_rewrite_review, otherwise empty string)";
+   - rewritten_question (string, only if needs_rewrite_review, otherwise empty string)";
 
         $response = wp_remote_post('https://api.openai.com/v1/chat/completions', [
             'headers' => [
