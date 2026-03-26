@@ -402,15 +402,18 @@ public function handle_chatbot_ingest($request) {
       $followup_id = $this->get_followup_post_id($thread_id, $i);
 
       if ($followup_id) {
-          $failed_prev = get_post_meta($followup_id, "_mp_classification_failed", true);
-          $is_streaming_prev = get_post_meta($followup_id, "_mp_is_streaming", true);
-          if (!$failed_prev && !$is_streaming_prev && get_post_meta($followup_id, "_mp_workflow_status", true) !== "hold") {
+          // Explicitly check if this post actually consumed an AI API call during a previous ingest pass
+          $was_ai_reviewed = get_post_meta($followup_id, "_mp_ai_reviewed", true);
+          if ($was_ai_reviewed === "1") {
              $ai_processed_count++;
           }
       }
 
       // --- UNCHANGED CONTENT PROTECTION ---
-      $current_hash = md5($clean_q . trim(wp_strip_all_tags($a_text)));
+      // Include sources and breakdown in the hash so we don't accidentally skip updating newly arriving attribution data
+      $turn_sources_json = wp_json_encode($turn["sources"] ?? []);
+      $turn_breakdown_json = wp_json_encode($turn["breakdown"] ?? []);
+      $current_hash = md5($clean_q . trim(wp_strip_all_tags($a_text)) . $turn_sources_json . $turn_breakdown_json);
       if ($followup_id) {
           $existing_hash = get_post_meta($followup_id, "_mp_turn_content_hash", true);
           if ($existing_hash === $current_hash) {
@@ -564,8 +567,13 @@ public function handle_chatbot_ingest($request) {
               delete_post_meta($followup_id, "_mp_is_streaming");
           }
 
-          if ($needs_ai || $skip_ai || get_post_meta($followup_id, "_mp_workflow_status", true) === false) {
+          if ($needs_ai || $skip_ai || !has_term('', 'mp_workflow_status', $followup_id)) {
                wp_set_object_terms($followup_id, $classification, "mp_workflow_status");
+          }
+
+          // Persist actual AI budget consumption flag
+          if ($did_consume_ai_budget && !$classification_failed) {
+              update_post_meta($followup_id, "_mp_ai_reviewed", "1");
           }
 
           update_post_meta($followup_id, "_mp_source_thread_id", $thread_id);
