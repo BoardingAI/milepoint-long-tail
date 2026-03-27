@@ -9,6 +9,12 @@ if (!defined("ABSPATH")) {
 
 class MP_REST_Handler
 {
+  // AI Safeguard Thresholds
+  const MAX_AI_FOLLOWUPS_PER_SESSION = 5;
+  const MAX_CONTEXT_TURNS = 2;
+  const MIN_WORD_COUNT = 3;
+  const AI_COOLDOWN_SECONDS = 30;
+
   /**
    * Register the REST API route
    */
@@ -250,11 +256,21 @@ public function handle_chatbot_ingest($request) {
       // Filter out null values from incomplete entries
       $sources = array_filter($sources);
 
-      return [
+      $mapped = [
         "question" => wp_kses_post($clean_question),
         "answer" => wp_kses_post($clean_answer),
         "sources" => $sources, // <--- This allows it to be saved to Post Meta
       ];
+
+      if (isset($item["breakdown"]) && is_array($item["breakdown"])) {
+          $mapped["breakdown"] = $item["breakdown"];
+      }
+
+      if (isset($item['is_streaming'])) {
+          $mapped['is_streaming'] = (bool) $item['is_streaming'];
+      }
+
+      return $mapped;
     }, $params["full_transcript"] ?? []);
 
     // Fix: Sanitize each related suggestion individually
@@ -296,95 +312,359 @@ public function handle_chatbot_ingest($request) {
         update_option('mp_sludge_quarantined_count', $quarantine_count + 1);
     }
 
-    // 1. Check if post already exists
-    $existing_id = $this->get_post_id_by_thread($thread_id);
+    // 1. PRIMARY POST: Check if primary post already exists
+    $primary_id = $this->get_post_id_by_thread($thread_id);
 
-    if ($existing_id) {
-      // Rolling hold strategy: If post is scheduled ('future'), reset the 24h timer
-      $status = get_post_status($existing_id);
+    $first_question_text = wp_strip_all_tags($transcript[0]["question"] ?? "New Q&A");
+    $first_answer_text = $transcript[0]["answer"] ?? "";
 
-      // Quarantine: If pollution is detected, downgrade status to draft
-      $new_status = $has_pollution ? 'draft' : $status;
+    if (!$primary_id) {
+      // Create new primary post
+      $future_ts_gmt = current_time("timestamp", true) + DAY_IN_SECONDS;
+      $post_date_gmt = gmdate("Y-m-d H:i:s", $future_ts_gmt);
+      $post_date = get_date_from_gmt($post_date_gmt);
 
-      if ($status === "future" || $has_pollution) {
-        $update_args = [
-          "ID" => $existing_id,
-          "post_status" => $new_status,
-        ];
+      $initial_status = $has_pollution ? "draft" : "future";
 
-        // Only reset the timer if it's staying 'future'
-        if ($new_status === "future") {
+      $primary_id = wp_insert_post([
+        "post_title" => $first_question_text,
+        "post_content" => "<!-- MILEPOINT_LONG_TAIL -->",
+        "post_status" => $initial_status,
+        "post_type" => "milepoint_qa",
+        "post_date" => $post_date,
+        "post_date_gmt" => $post_date_gmt,
+      ]);
+
+      if (is_wp_error($primary_id) || empty($primary_id)) {
+        error_log("MilePoint: Failed to create scheduled post for thread " . $thread_id);
+        return new WP_REST_Response(["message" => "Failed to create scheduled post."], 500);
+      }
+    } else {
+        // Quarantine: If pollution is detected, downgrade status to draft
+        if ($has_pollution) {
+            $status = get_post_status($primary_id);
+            if ($status !== 'draft') {
+                wp_update_post([
+                    "ID" => $primary_id,
+                    "post_status" => 'draft',
+                ]);
+            }
+        }
+        // Do NOT push the publish date forward for follow-up turns
+    }
+
+    // Set Primary Post Taxonomy and Meta
+    wp_set_object_terms($primary_id, "primary_first_turn", "mp_workflow_status");
+    update_post_meta($primary_id, "_gist_thread_id", $thread_id);
+    update_post_meta($primary_id, "_mp_source_thread_id", $thread_id);
+    update_post_meta($primary_id, "_mp_source_turn_index", 0);
+    update_post_meta($primary_id, "_mp_is_primary_turn", "1");
+
+    // Store full raw transcript privately
+    update_post_meta($primary_id, "_raw_transcript", $transcript);
+    update_post_meta($primary_id, "_related_suggestions", $related);
+    update_post_meta($primary_id, "_breakdown", $breakdown);
+
+    // Store Single Turn Content for Primary Post
+    $primary_single_turn = [
+      "question" => $transcript[0]["question"] ?? "",
+      "answer" => $transcript[0]["answer"] ?? "",
+      "sources" => $transcript[0]["sources"] ?? [],
+      "breakdown" => $transcript[0]["breakdown"] ?? $breakdown, // fallback to overall breakdown if missing per-turn
+      "is_rewritten" => false
+    ];
+    update_post_meta($primary_id, "_mp_single_turn_content", $primary_single_turn);
+    update_post_meta($primary_id, "_mp_original_question", $transcript[0]["question"] ?? "");
+    update_post_meta($primary_id, "_mp_original_answer", $transcript[0]["answer"] ?? "");
+
+    $this->process_featured_image($primary_id, $transcript);
+
+    // 2. PROCESS FOLLOW-UP TURNS
+    $api_key = get_option('mp_openai_api_key');
+    $prior_context_arr = [];
+    $prior_context_arr[] = "Q: " . $first_question_text . "\nA: " . wp_strip_all_tags($first_answer_text);
+
+    $ai_processed_count = 0;
+
+    // Skip index 0 (Primary)
+    for ($i = 1; $i < count($transcript); $i++) {
+      // Explicitly initialize the AI budget tracking flag at the start of every iteration
+      $did_consume_ai_budget = false;
+
+      $turn = $transcript[$i];
+      $q_text = $turn["question"] ?? "";
+      $a_text = $turn["answer"] ?? "";
+      $clean_q = trim(wp_strip_all_tags($q_text));
+
+      // We only care about user questions, if it's empty, skip
+      if (empty($clean_q)) {
+        $prior_context_arr[] = "A: " . wp_strip_all_tags($a_text);
+        continue;
+      }
+
+      $followup_id = $this->get_followup_post_id($thread_id, $i);
+
+      if ($followup_id) {
+          // Explicitly check if this post actually consumed an AI API call during a previous ingest pass
+          $was_ai_reviewed = get_post_meta($followup_id, "_mp_ai_reviewed", true);
+          if ($was_ai_reviewed === "1") {
+             $ai_processed_count++;
+          }
+      }
+
+      // --- UNCHANGED CONTENT PROTECTION ---
+      // Include sources and breakdown in the hash so we don't accidentally skip updating newly arriving attribution data
+      $turn_sources_json = wp_json_encode($turn["sources"] ?? []);
+      $turn_breakdown_json = wp_json_encode($turn["breakdown"] ?? []);
+      $current_hash = md5($clean_q . trim(wp_strip_all_tags($a_text)) . $turn_sources_json . $turn_breakdown_json);
+      if ($followup_id) {
+          $existing_hash = get_post_meta($followup_id, "_mp_turn_content_hash", true);
+          if ($existing_hash === $current_hash) {
+              $prior_context_arr[] = "Q: " . $clean_q . "\nA: " . wp_strip_all_tags($a_text);
+              continue;
+          }
+      }
+
+      $needs_ai = false;
+      $is_currently_streaming = isset($turn['is_streaming']) && $turn['is_streaming'] === true;
+
+      if (!$followup_id) {
+          $needs_ai = true;
+      } else {
+          $failed_prev = get_post_meta($followup_id, "_mp_classification_failed", true);
+          $was_streaming_prev = get_post_meta($followup_id, "_mp_is_streaming", true);
+
+          if ($failed_prev || ($was_streaming_prev && !$is_currently_streaming)) {
+              $needs_ai = true;
+          }
+      }
+
+      $classification = "hold";
+      $reason = "";
+      $confidence = "";
+      $rewritten_q = "";
+      $classification_failed = false;
+      $rewrite_failed = false;
+      $skip_ai = false;
+      $lock_key = "mp_ai_lock_{$thread_id}_{$i}";
+
+      if ($needs_ai) {
+          if ($is_currently_streaming) {
+               $skip_ai = true;
+               $reason = "Skipped: Turn is still mid-update (streaming)";
+          }
+
+          if (!$skip_ai && get_transient($lock_key)) {
+              $skip_ai = true;
+              $reason = "Skipped: Concurrent processing lock active";
+          }
+
+          $last_attempt = get_transient("mp_ai_cooldown_{$thread_id}_{$i}");
+          if (!$skip_ai && $last_attempt) {
+              $skip_ai = true;
+              $reason = "Skipped: Rapid update cooldown active";
+          }
+
+          if (!$skip_ai && str_word_count($clean_q) < self::MIN_WORD_COUNT) {
+              $skip_ai = true;
+              $reason = "Skipped: Follow-up too short (low signal)";
+          }
+
+          if (!$skip_ai && $ai_processed_count >= self::MAX_AI_FOLLOWUPS_PER_SESSION) {
+              $skip_ai = true;
+              $reason = "Skipped: Max AI follow-ups per session exceeded";
+          }
+
+          if (!$skip_ai && $api_key) {
+              set_transient($lock_key, true, 60);
+              set_transient("mp_ai_cooldown_{$thread_id}_{$i}", true, self::AI_COOLDOWN_SECONDS);
+          }
+      }
+
+      $bounded_context_arr = array_slice($prior_context_arr, -(self::MAX_CONTEXT_TURNS));
+      $prior_context = implode("\n\n", $bounded_context_arr);
+
+      if ($api_key && $needs_ai && !$skip_ai) {
+         $ai_handler = new MP_AI_Handler();
+
+         // Mark that an actual OpenAI request is being attempted
+         $did_consume_ai_budget = true;
+
+         $ai_res = $ai_handler->get_followup_classification($api_key, $first_question_text, $prior_context, wp_strip_all_tags($q_text), wp_strip_all_tags($a_text));
+
+         if ($ai_res && isset($ai_res['classification'])) {
+           $classification = $ai_res['classification'];
+           $allowed_buckets = ['ready_as_is', 'context_added', 'hold'];
+           if (!in_array($classification, $allowed_buckets)) {
+               error_log("MilePoint: AI returned unsupported bucket: " . $classification . ". Falling back to hold.");
+               $classification = "hold";
+               $classification_failed = true;
+               $reason = "AI returned invalid bucket (hallucination).";
+           }
+
+           $reason = $ai_res['reason'] ?? '';
+           $confidence = $ai_res['confidence'] ?? '';
+
+           if ($classification === 'context_added') {
+               $rewritten_q = sanitize_text_field($ai_res['rewritten_question'] ?? '');
+
+               if (empty($rewritten_q)) {
+                   $rewrite_failed = true;
+                   $classification = "hold";
+                   $reason = "Rewrite failed or returned empty.";
+               }
+           }
+         } else {
+           $classification_failed = true;
+           $reason = "AI request failed or returned invalid JSON.";
+         }
+      } elseif (!$api_key && $needs_ai && !$skip_ai) {
+         $classification_failed = true;
+         $reason = "API Key missing.";
+      }
+
+      if ($needs_ai && !$skip_ai) {
+          delete_transient($lock_key);
+          if ($did_consume_ai_budget) {
+              $ai_processed_count++;
+          }
+      }
+
+      if ($needs_ai || $skip_ai || !$followup_id) {
+        $post_title = wp_strip_all_tags($q_text);
+        if ($classification === 'context_added' && !empty($rewritten_q)) {
+            $post_title = wp_strip_all_tags($rewritten_q);
+        }
+
+        // Auto-schedule eligible follow-ups matching primary behavior
+        $publish_status = 'draft';
+        $post_date = current_time('mysql');
+        $post_date_gmt = current_time('mysql', 1);
+
+        if ($classification === 'ready_as_is' || $classification === 'context_added') {
             $future_ts_gmt = current_time("timestamp", true) + DAY_IN_SECONDS;
             $post_date_gmt = gmdate("Y-m-d H:i:s", $future_ts_gmt);
             $post_date = get_date_from_gmt($post_date_gmt);
-
-            $update_args["post_date"] = $post_date;
-            $update_args["post_date_gmt"] = $post_date_gmt;
+            $publish_status = $has_pollution ? "draft" : "future";
         }
 
-        $update_result = wp_update_post($update_args);
+        if (!$followup_id) {
+            $new_id = wp_insert_post([
+              "post_title" => $post_title,
+              "post_content" => "<!-- MILEPOINT_LONG_TAIL -->",
+              "post_status" => $publish_status,
+              "post_date" => $post_date,
+              "post_date_gmt" => $post_date_gmt,
+              "post_type" => "milepoint_qa",
+            ]);
 
-        if ($update_result === 0) {
-          error_log("MilePoint: Failed to update/reschedule post " . $existing_id);
-          return new WP_REST_Response(
-            ["message" => "Failed to update/reschedule post."],
-            500,
-          );
+            if (is_wp_error($new_id) || empty($new_id)) {
+                error_log("MilePoint: Failed to insert follow-up post for thread " . $thread_id . " turn " . $i);
+                $followup_id = false;
+            } else {
+                $followup_id = $new_id;
+            }
+        } else {
+            $update_args = [
+                "ID" => $followup_id,
+                "post_title" => $post_title,
+            ];
+
+            // Only update schedule if it's currently a draft transitioning to a scheduled post,
+            // or if we are actively re-scheduling it (avoid resetting manual edits).
+            // For safety, we enforce the new status if it was previously held/failed.
+            if ($classification === 'ready_as_is' || $classification === 'context_added') {
+                $current_status = get_post_status($followup_id);
+                if ($current_status === 'draft') {
+                    $update_args["post_status"] = $publish_status;
+                    $update_args["post_date"] = $post_date;
+                    $update_args["post_date_gmt"] = $post_date_gmt;
+                }
+            }
+
+            $update_res = wp_update_post($update_args);
+            if ($update_res === 0) {
+                error_log("MilePoint: Failed to update follow-up post title for ID " . $followup_id);
+            }
         }
       }
 
-      update_post_meta($existing_id, "_raw_transcript", $transcript);
-      update_post_meta($existing_id, "_related_suggestions", $related);
-      update_post_meta($existing_id, "_breakdown", $breakdown);
+      if ($followup_id) {
+          update_post_meta($followup_id, "_mp_turn_content_hash", $current_hash);
 
-      // Attempt to set a featured image if missing
-      $this->process_featured_image($existing_id, $transcript);
+          if ($is_currently_streaming) {
+              update_post_meta($followup_id, "_mp_is_streaming", true);
+          } else {
+              delete_post_meta($followup_id, "_mp_is_streaming");
+          }
 
-      return new WP_REST_Response(
-        ["message" => "Post updated with sources."],
-        200,
-      );
-    }
+          if ($needs_ai || $skip_ai || !has_term('', 'mp_workflow_status', $followup_id)) {
+               wp_set_object_terms($followup_id, $classification, "mp_workflow_status");
+          }
 
-    // 2. CREATE NEW post
-    $first_question = wp_strip_all_tags(
-      $transcript[0]["question"] ?? "New Q&A",
-    );
+          // Explicitly record that AI budget was consumed for this turn, even if the API call failed
+          if ($did_consume_ai_budget) {
+              update_post_meta($followup_id, "_mp_ai_reviewed", "1");
+          }
 
-    $future_ts_gmt = current_time("timestamp", true) + DAY_IN_SECONDS;
-    $post_date_gmt = gmdate("Y-m-d H:i:s", $future_ts_gmt);
-    $post_date = get_date_from_gmt($post_date_gmt);
+          update_post_meta($followup_id, "_mp_source_thread_id", $thread_id);
+          update_post_meta($followup_id, "_mp_source_turn_index", $i);
+          update_post_meta($followup_id, "_mp_parent_primary_post_id", $primary_id);
+          update_post_meta($followup_id, "_mp_is_primary_turn", "0");
 
-    // Quarantine: default to draft if pollution detected
-    $initial_status = $has_pollution ? "draft" : "future";
+          update_post_meta($followup_id, "_mp_original_question", $q_text);
+          update_post_meta($followup_id, "_mp_original_answer", $a_text);
 
-    $post_id = wp_insert_post([
-      "post_title" => $first_question,
-      "post_content" => "<!-- MILEPOINT_LONG_TAIL -->",
-      "post_status" => $initial_status,
-      "post_type" => "milepoint_qa",
-      "post_date" => $post_date,
-      "post_date_gmt" => $post_date_gmt,
-    ]);
+          if ($needs_ai || $skip_ai) {
+              if ($rewritten_q) update_post_meta($followup_id, "_mp_rewritten_question", $rewritten_q);
 
-    if (is_wp_error($post_id) || empty($post_id)) {
-      error_log("MilePoint: Failed to create scheduled post for thread " . $thread_id);
-      return new WP_REST_Response(
-        ["message" => "Failed to create scheduled post."],
-        500,
-      );
-    }
+              if ($reason) {
+                  update_post_meta($followup_id, "_mp_classification_reason", $reason);
+              } else {
+                  delete_post_meta($followup_id, "_mp_classification_reason");
+              }
 
-    update_post_meta($post_id, "_gist_thread_id", $thread_id);
-    update_post_meta($post_id, "_raw_transcript", $transcript);
-    update_post_meta($post_id, "_related_suggestions", $related);
-    update_post_meta($post_id, "_breakdown", $breakdown);
+              if ($confidence) update_post_meta($followup_id, "_mp_classification_confidence", $confidence);
 
-    // Attempt to set a featured image
-    $this->process_featured_image($post_id, $transcript);
+              if ($classification_failed) {
+                  update_post_meta($followup_id, "_mp_classification_failed", true);
+              } else {
+                  delete_post_meta($followup_id, "_mp_classification_failed");
+              }
+
+              if ($rewrite_failed) {
+                  update_post_meta($followup_id, "_mp_rewrite_failed", true);
+              } else {
+                  delete_post_meta($followup_id, "_mp_rewrite_failed");
+              }
+
+              $single_turn = [
+                "question" => $rewritten_q ?: $q_text,
+                "answer" => $a_text, // Always use original captured answer
+                "sources" => $turn["sources"] ?? [],
+                "breakdown" => $turn["breakdown"] ?? [],
+                "is_rewritten" => !empty($rewritten_q)
+              ];
+              update_post_meta($followup_id, "_mp_single_turn_content", $single_turn);
+          } else {
+              $existing_single = get_post_meta($followup_id, "_mp_single_turn_content", true);
+              if (is_array($existing_single)) {
+                  // We always use the original captured answer, even if the question was rewritten previously.
+                  // We update sources and breakdown to catch streamed arrivals.
+                  $existing_single["answer"] = $a_text;
+                  $existing_single["sources"] = $turn["sources"] ?? [];
+                  if (isset($turn["breakdown"])) {
+                      $existing_single["breakdown"] = $turn["breakdown"];
+                  }
+                  update_post_meta($followup_id, "_mp_single_turn_content", $existing_single);
+              }
+          }
+      }
+
+      $prior_context_arr[] = "Q: " . $clean_q . "\nA: " . wp_strip_all_tags($a_text);    }
 
     return new WP_REST_Response(
-      ["message" => "New scheduled post created. ID: " . $post_id],
+      ["message" => "Post and follow-ups updated with sources.", "primary_id" => $primary_id],
       200,
     );
   }
@@ -485,6 +765,31 @@ public function handle_chatbot_ingest($request) {
     return false;
   }
 
+
+
+  private function get_followup_post_id($thread_id, $turn_index) {
+    if (empty($thread_id) || $thread_id === "unknown") return false;
+    $posts = get_posts([
+      "post_type" => "milepoint_qa",
+      "meta_query" => [
+        "relation" => "AND",
+        [
+          "key" => "_mp_source_thread_id",
+          "value" => $thread_id,
+          "compare" => "="
+        ],
+        [
+          "key" => "_mp_source_turn_index",
+          "value" => $turn_index,
+          "compare" => "="
+        ]
+      ],
+      "posts_per_page" => 1,
+      "fields" => "ids",
+      "post_status" => "any"
+    ]);
+    return !empty($posts) ? $posts[0] : false;
+  }
   private function get_post_id_by_thread($thread_id)
   {
     if (empty($thread_id) || $thread_id === "unknown") {
@@ -493,22 +798,47 @@ public function handle_chatbot_ingest($request) {
 
     $posts = get_posts([
       "post_type" => "milepoint_qa",
-      "meta_key" => "_gist_thread_id",
-      "meta_value" => $thread_id,
+      "meta_query" => [
+        "relation" => "AND",
+        [
+          "key" => "_gist_thread_id",
+          "value" => $thread_id,
+          "compare" => "="
+        ],
+        [
+          "key" => "_mp_is_primary_turn",
+          "value" => "1", // Explicitly require the "1" string
+          "compare" => "="
+        ]
+      ],
       "posts_per_page" => 1,
       "fields" => "ids",
-      // Check ALL statuses!!
-      "post_status" => [
-        "publish",
-        "pending",
-        "draft",
-        "auto-draft",
-        "future",
-        "private",
-        "inherit",
-        "trash",
-      ],
+      "post_status" => "any"
     ]);
+
+    // Fallback for older posts that might not have _mp_is_primary_turn yet
+    if (empty($posts)) {
+        $posts = get_posts([
+          "post_type" => "milepoint_qa",
+          "meta_query" => [
+            "relation" => "AND",
+            [
+              "key" => "_gist_thread_id",
+              "value" => $thread_id,
+              "compare" => "="
+            ],
+            [
+              "key" => "_mp_is_primary_turn",
+              "compare" => "NOT EXISTS"
+            ]
+          ],
+          "posts_per_page" => 1,
+          "fields" => "ids",
+          "post_status" => "any",
+          "orderby" => "ID", // get the oldest one as primary
+          "order" => "ASC"
+        ]);
+    }
 
     return !empty($posts) ? $posts[0] : false;
   }

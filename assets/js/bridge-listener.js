@@ -2,26 +2,57 @@
  * MilePoint Long-Tail Bridge - Clean Polling Version
  */
 // assets/js/bridge-listener.js
-function getBreakdown() {
-  const widget = document.querySelector("gist-chat-widget");
-  const shadow = widget?.shadowRoot;
-  if (!shadow) return;
+// Safe extraction that avoids assumptions about shadow vs light DOM hierarchy
+const findElementForBlock = (block, selector) => {
+  if (!block) return null;
 
-  const attributionBar = shadow.querySelector("gist-attribution-bar");
+  // 1. Try light DOM inside block
+  let el = block.querySelector(selector);
+  if (el) return el;
+
+  // 2. Try inside gist-chat-response shadow DOM
+  const responseWidget = block.querySelector("gist-chat-response");
+  if (responseWidget && responseWidget.shadowRoot) {
+    el = responseWidget.shadowRoot.querySelector(selector);
+    if (el) return el;
+  }
+
+  // 3. Try adjacent siblings (e.g. if it renders after the .qa-block)
+  let next = block.nextElementSibling;
+  while (next && (!next.classList || !next.classList.contains("qa-block"))) {
+    if (next.matches && next.matches(selector)) return next;
+    if (next.querySelector) {
+      el = next.querySelector(selector);
+      if (el) return el;
+    }
+    if (next.shadowRoot) {
+      el = next.shadowRoot.querySelector(selector);
+      if (el) return el;
+    }
+    next = next.nextElementSibling;
+  }
+
+  return null;
+};
+
+function getBreakdownFromElement(containerElement) {
+  if (!containerElement) return [];
+
+  // Use the robust finder to locate the attribution bar relative to the container
+  const attributionBar = containerElement.classList?.contains("qa-block")
+      ? findElementForBlock(containerElement, "gist-attribution-bar")
+      : containerElement.querySelector("gist-attribution-bar");
+
   let breakdown = [];
   if (attributionBar && attributionBar.shadowRoot) {
-    // Query inside the shadow root for each column
     const columns = attributionBar.shadowRoot.querySelectorAll(".col");
 
     breakdown = Array.from(columns).map((col) => {
       const labelSpan = col.querySelector(".label");
       if (!labelSpan) return null;
 
-      // The percentage is inside the <b> tag
       const percentage = labelSpan.querySelector("b")?.innerText.trim() || "";
 
-      // The source name is the text node after the <b> tag
-      // We clone the node and remove the <b> to get just the clean source name
       const labelClone = labelSpan.cloneNode(true);
       const bTag = labelClone.querySelector("b");
       if (bTag) bTag.remove();
@@ -32,10 +63,14 @@ function getBreakdown() {
         percentage: Number(percentage.replace("%", "") || 0),
       };
     }).filter(Boolean);
-  } else {
-    console.log("Attribution bar or Shadow Root not found.");
   }
   return breakdown;
+}
+
+// Keep the global fallback for legacy top-level payload structure if needed
+function getBreakdown() {
+  const widget = document.querySelector("gist-chat-widget");
+  return getBreakdownFromElement(widget?.shadowRoot);
 }
 
 function getDeepFlattenedClone(node) {
@@ -117,7 +152,8 @@ function getDeepFlattenedClone(node) {
       }
 
       // 3. Capture Citations/Sources (from Carousel Shadow DOM)
-      const carousel = block.querySelector("gist-citation-carousel");
+      // Use robust finder in case carousel moved to sibling or shadow DOM
+      const carousel = findElementForBlock(block, "gist-citation-carousel");
       let sources = [];
       if (carousel?.shadowRoot) {
         const cards = carousel.shadowRoot.querySelectorAll(
@@ -139,7 +175,10 @@ function getDeepFlattenedClone(node) {
         }));
       }
 
-      return { question, answer, sources };
+      // 4. Capture turn-specific attribution breakdown
+      const breakdown = getBreakdownFromElement(block);
+
+      return { question, answer, sources, breakdown };
     });
   };
 

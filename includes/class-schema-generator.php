@@ -45,25 +45,34 @@ class MP_Schema_Generator
             return;
         }
 
-        $transcript = get_post_meta(get_the_ID(), "_raw_transcript", true);
-        if (empty($transcript) || !is_array($transcript)) {
-            return;
+                $post_id = get_the_ID();
+        $single_turn = get_post_meta($post_id, '_mp_single_turn_content', true);
+
+        // Fallback for legacy posts that haven't been migrated
+        if (empty($single_turn)) {
+            $transcript = get_post_meta($post_id, '_raw_transcript', true);
+            if (is_array($transcript) && !empty($transcript)) {
+                $single_turn = $transcript[0];
+            } else {
+                return;
+            }
         }
 
-        // --- Data Extraction ---
-        $headline = html_entity_decode(get_the_title(), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $datePublished = get_the_date('c'); // ISO 8601
-        $dateModified = get_the_modified_date('c'); // ISO 8601
+        // Setup common vars
         $url = get_permalink();
+        $headline = get_the_title();
+        $datePublished = get_the_date('c');
+        $dateModified = get_the_modified_date('c');
 
+        // Safe excerpt stripping
         $description = get_the_excerpt();
         if (!empty($description)) {
-             $description = html_entity_decode(wp_strip_all_tags($description), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $description = html_entity_decode(wp_strip_all_tags($description), ENT_QUOTES | ENT_HTML5, 'UTF-8');
         }
 
         // Fallback description if excerpt is empty
-        if (empty($description) && !empty($transcript[0]['answer'])) {
-            $description = wp_trim_words($this->to_plain_text($transcript[0]['answer']), 20);
+        if (empty($description) && !empty($single_turn['answer'])) {
+            $description = wp_trim_words($this->to_plain_text($single_turn['answer']), 20);
         }
 
         $authorName = "Guest";
@@ -81,25 +90,24 @@ class MP_Schema_Generator
 
         $imageUrl = "";
         if (has_post_thumbnail()) {
-            $imageUrl = get_the_post_thumbnail_url(get_the_ID(), 'full');
+            $imageUrl = get_the_post_thumbnail_url($post_id, 'full');
         }
 
         // --- Main Entity: First Question ---
-        $firstItem = $transcript[0];
-        $mainQuestionText = !empty($firstItem['question'])
-            ? $this->to_plain_text($firstItem['question'])
+        $mainQuestionText = !empty($single_turn['question'])
+            ? $this->to_plain_text($single_turn['question'])
             : '';
 
         // --- Comments: Answers and Subsequent Questions ---
         $comments = [];
 
         // First Answer (AI)
-        if (!empty($firstItem['answer'])) {
+        if (!empty($single_turn['answer'])) {
             $comments[] = [
                 '@type' => 'Comment',
                 '@id' => $url . '#comment-a-0',
                 'name' => 'Answer 1',
-                'text' => $this->to_plain_text($firstItem['answer']),
+                'text' => $this->to_plain_text($single_turn['answer']),
                 'datePublished' => $datePublished,
                 'url' => $url . '#mp-a-0',
                 'author' => [
@@ -108,46 +116,6 @@ class MP_Schema_Generator
                     'name' => 'AI Assistant'
                 ]
             ];
-        }
-
-        // Subsequent items
-        $total_items = count($transcript);
-        for ($i = 1; $i < $total_items; $i++) {
-            $item = $transcript[$i];
-
-            // Question (User)
-            if (!empty($item['question'])) {
-                $comments[] = [
-                    '@type' => 'Comment',
-                    '@id' => $url . '#comment-q-' . $i,
-                    'name' => 'Follow-up Question ' . $i,
-                    'text' => $this->to_plain_text($item['question']),
-                    'datePublished' => $datePublished,
-                    'url' => $url . '#mp-q-' . $i,
-                    'author' => [
-                        '@type' => 'Person',
-                        '@id' => $url . '#author',
-                        'name' => 'Guest'
-                    ]
-                ];
-            }
-
-            // Answer (AI)
-            if (!empty($item['answer'])) {
-                $comments[] = [
-                    '@type' => 'Comment',
-                    '@id' => $url . '#comment-a-' . $i,
-                    'name' => 'Answer ' . ($i + 1),
-                    'text' => $this->to_plain_text($item['answer']),
-                    'datePublished' => $datePublished,
-                    'url' => $url . '#mp-a-' . $i,
-                    'author' => [
-                        '@type' => 'Person',
-                        '@id' => $url . '#ai-assistant',
-                        'name' => 'AI Assistant'
-                    ]
-                ];
-            }
         }
 
         $interactionCount = count($comments);

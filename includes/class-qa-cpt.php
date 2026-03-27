@@ -18,6 +18,15 @@ class MP_QA_CPT_Handler
     add_action("init", [$this, "register_cpt"]);
     add_action("pre_get_posts", [$this, "handle_hub_sorting"]);
 
+    // Admin Columns
+    add_filter("manage_milepoint_qa_posts_columns", [$this, "set_custom_columns"]);
+    add_action("manage_milepoint_qa_posts_custom_column", [$this, "custom_column_data"], 10, 2);
+    add_action("restrict_manage_posts", [$this, "add_taxonomy_filters"]);
+
+    // Metaboxes
+    add_action("add_meta_boxes", [$this, "add_metaboxes"]);
+
+
     // Hub Template Hijacking
     add_filter("template_include", [$this, "force_hub_layout"]);
 
@@ -33,6 +42,161 @@ class MP_QA_CPT_Handler
   /**
    * Logs every time a milepoint_qa post changes status
    */
+
+  public function add_taxonomy_filters() {
+    global $typenow;
+    if ($typenow == "milepoint_qa") {
+      $taxonomy = "mp_workflow_status";
+      $tax_obj = get_taxonomy($taxonomy);
+      wp_dropdown_categories([
+        "show_option_all" => "All Workflow Buckets",
+        "taxonomy"        => $taxonomy,
+        "name"            => $taxonomy,
+        "orderby"         => "name",
+        "selected"        => isset($_GET[$taxonomy]) ? $_GET[$taxonomy] : "",
+        "show_count"      => true,
+        "hide_empty"      => false,
+        "value_field"     => "slug",
+      ]);
+    }
+  }
+
+  public function set_custom_columns($columns) {
+    $new_columns = [];
+    foreach ($columns as $key => $title) {
+      if ($key === "date") {
+        $new_columns["mp_workflow_bucket"] = "Workflow Bucket";
+        $new_columns["mp_source_thread"] = "Source Thread";
+        $new_columns["mp_turn_index"] = "Turn";
+        $new_columns["mp_type"] = "Type";
+        $new_columns["mp_original_preview"] = "Original Preview";
+      }
+      $new_columns[$key] = $title;
+    }
+    return $new_columns;
+  }
+
+  public function custom_column_data($column, $post_id) {
+    switch ($column) {
+      case "mp_workflow_bucket":
+        $terms = get_the_terms($post_id, "mp_workflow_status");
+        if ($terms && !is_wp_error($terms)) {
+          $term_names = wp_list_pluck($terms, "name");
+          echo esc_html(implode(", ", $term_names));
+        } else {
+          echo "—";
+        }
+        break;
+      case "mp_source_thread":
+        $thread_id = get_post_meta($post_id, "_mp_source_thread_id", true);
+        if ($thread_id) {
+          echo esc_html(substr($thread_id, 0, 12)) . "...";
+        } else {
+          echo "—";
+        }
+        break;
+      case "mp_turn_index":
+        $turn = get_post_meta($post_id, "_mp_source_turn_index", true);
+        echo $turn !== "" ? esc_html($turn) : "—";
+        break;
+      case "mp_type":
+        $is_primary = get_post_meta($post_id, "_mp_is_primary_turn", true);
+        echo $is_primary ? "<strong>Primary</strong>" : "Follow-up";
+        break;
+      case "mp_original_preview":
+        $orig = get_post_meta($post_id, "_mp_original_question", true);
+        if ($orig) {
+          echo esc_html(wp_trim_words($orig, 8, "..."));
+        } else {
+          echo "—";
+        }
+        break;
+    }
+  }
+
+  public function add_metaboxes() {
+    add_meta_box(
+      "mp_original_turn_metabox",
+      "Original Captured Turn",
+      [$this, "render_original_metabox"],
+      "milepoint_qa",
+      "normal",
+      "high"
+    );
+
+    add_meta_box(
+      "mp_rewritten_turn_metabox",
+      "Rewritten Standalone Question",
+      [$this, "render_rewritten_metabox"],
+      "milepoint_qa",
+      "normal",
+      "high"
+    );
+  }
+
+  public function render_original_metabox($post) {
+    $original_question = get_post_meta($post->ID, "_mp_original_question", true);
+    $original_answer = get_post_meta($post->ID, "_mp_original_answer", true);
+    $thread_id = get_post_meta($post->ID, "_mp_source_thread_id", true);
+    $turn_index = get_post_meta($post->ID, "_mp_source_turn_index", true);
+    $parent_id = get_post_meta($post->ID, "_mp_parent_primary_post_id", true);
+    $reason = get_post_meta($post->ID, "_mp_classification_reason", true);
+    $confidence = get_post_meta($post->ID, "_mp_classification_confidence", true);
+    $classification_failed = get_post_meta($post->ID, "_mp_classification_failed", true);
+    $rewrite_failed = get_post_meta($post->ID, "_mp_rewrite_failed", true);
+
+    $terms = get_the_terms($post->ID, "mp_workflow_status");
+    $bucket = ($terms && !is_wp_error($terms)) ? implode(", ", wp_list_pluck($terms, "name")) : "None";
+
+    echo "<div style='background:#f9f9f9; padding:15px; border:1px solid #ddd; margin-bottom:10px;'>";
+    echo "<p><strong>Source Thread / Session ID:</strong> " . esc_html($thread_id) . "</p>";
+    echo "<p><strong>Source Turn Index:</strong> " . esc_html($turn_index) . "</p>";
+
+    if ($parent_id) {
+      $edit_link = get_edit_post_link($parent_id);
+      echo "<p><strong>Parent Primary Post ID:</strong> <a href='" . esc_url($edit_link) . "'>" . esc_html($parent_id) . "</a></p>";
+    } else {
+      echo "<p><strong>Parent Primary Post ID:</strong> N/A (Is Primary)</p>";
+    }
+
+    echo "<p><strong>Workflow Bucket:</strong> " . esc_html($bucket) . "</p>";
+
+    if ($reason) {
+      echo "<p><strong>Classification Reason:</strong> " . esc_html($reason) . "</p>";
+    }
+    if ($confidence) {
+      echo "<p><strong>Classification Confidence:</strong> " . esc_html($confidence) . "</p>";
+    }
+    if ($classification_failed) {
+      echo "<p style='color:red;'><strong>Classification Failed:</strong> Yes</p>";
+    }
+    if ($rewrite_failed) {
+      echo "<p style='color:red;'><strong>Rewrite Failed:</strong> Yes</p>";
+    }
+
+    echo "<hr/>";
+    echo "<h4>Original Question</h4>";
+    echo "<blockquote>" . nl2br(esc_html($original_question)) . "</blockquote>";
+
+    echo "<h4>Original Answer</h4>";
+    echo "<blockquote>" . wp_kses_post($original_answer) . "</blockquote>";
+    echo "</div>";
+  }
+
+  public function render_rewritten_metabox($post) {
+    $rewritten_question = get_post_meta($post->ID, "_mp_rewritten_question", true);
+
+    echo "<div style='background:#f9f9f9; padding:15px; border:1px solid #ddd;'>";
+    if ($rewritten_question) {
+        echo "<h4>Rewritten Standalone Question</h4>";
+        echo "<blockquote>" . nl2br(esc_html($rewritten_question)) . "</blockquote>";
+        echo "<p><em>Note: Only the question is rewritten. The answer body is preserved directly from the original capture.</em></p>";
+    } else {
+      echo "<p><em>No rewrite was generated for this item.</em></p>";
+    }
+    echo "</div>";
+  }
+
   public function track_status_transitions($new_status, $old_status, $post)
   {
     if ($post->post_type !== "milepoint_qa") {
@@ -78,6 +242,35 @@ class MP_QA_CPT_Handler
       ],
       "menu_icon" => "dashicons-format-chat",
     ]);
+
+    // Register Workflow Status Taxonomy
+    register_taxonomy("mp_workflow_status", ["milepoint_qa"], [
+      "labels" => [
+        "name" => "Workflow Status",
+        "singular_name" => "Workflow Status",
+      ],
+      "public" => false,
+      "show_ui" => true,
+      "show_admin_column" => false, // We will handle admin columns manually
+      "show_in_nav_menus" => false,
+      "show_tagcloud" => false,
+      "hierarchical" => true, // Better for filtering UI
+      "rewrite" => false,
+    ]);
+
+    // Ensure terms exist
+    $terms = [
+      "primary_first_turn" => "Primary First Turn",
+      "ready_as_is" => "Ready As Is",
+      "context_added" => "Context Added",
+      "hold" => "Hold",
+    ];
+
+    foreach ($terms as $slug => $name) {
+      if (!term_exists($slug, "mp_workflow_status")) {
+        wp_insert_term($name, "mp_workflow_status", ["slug" => $slug]);
+      }
+    }
   }
 
   /**
