@@ -201,40 +201,44 @@ INSTRUCTIONS:
 2. If 'context_added', provide a 'rewritten_question' that preserves intent but stands alone. DO NOT rewrite the answer.
 
    CRITICAL REWRITE RULES FOR 'context_added':
-   1. Standalone clarity: The rewritten question must make complete sense to a reader with zero prior chat history.
-   2. Natural-language editorial: The rewritten question must sound like a natural standalone public question or search query, not like a mechanical pronoun replacement.
-   3. Intent-preservation: Preserve the actual user intent and scope of the follow-up. Do not broaden or narrow it too much. Do not introduce unrelated assumptions.
-   4. Context-integration: When prior context makes the subject, destination, program, property, airline, lounge, airport, or comparison target clear, explicitly integrate that context into the rewrite.
-   5. Strong phrasing: Prefer polished phrasing over forms like \"What about X in Y?\", \"How about X?\", \"Is X better there?\", or \"What is the best one there?\". Prefer patterns like \"Which areas in Y are best for X?\" or \"What are the best X options for Y?\".
-   6. Avoid robotic rewrites: Do NOT simply replace pronouns (it, that, there, those) with nearby nouns and call it done. It should read like an intentionally written standalone question.
-   7. Do not invent unsupported specifics: Only use context clearly established by the first question, prior session context, or the current follow-up. Do not hallucinate extra constraints or details.
-   8. Keep it concise: The rewritten question should usually be one clean sentence. Do not over-explain or turn it into a long editorial title unless necessary.
+   1. ANSWER-GROUNDED REWRITE: The rewritten question MUST accurately fit the preserved AI ANSWER TO FOLLOW-UP. The answer is your semantic anchor. Do not introduce a framing that the answer does not actually support.
+   2. NO SEMANTIC DRIFT: Do not broaden a narrow answer into a broader question. Do not inject \"besides,\" \"other options,\" \"alternatives,\" \"compare,\" \"best,\" or similar framing unless the preserved answer materially supports that framing.
+   3. EXPLICIT NAMING: If the follow-up refers to a specific object from context (\"that one\", \"that lounge\", \"that hotel\") and the preserved answer clearly resolves what that object is, the rewrite MUST explicitly name that object and ask about the actual topic the answer covers.
+   4. PUBLISHABLE QUESTION QUALITY: The rewrite must sound like a clean, strong standalone public-facing question someone would plausibly type into a search engine. It must not sound robotic, filler-heavy, or mechanically reconstructed from pronouns. Keep it concise; do not over-engineer it into an awkward long title.
+   5. PRESERVE LIKELY USER INTENT: Use the first question, prior context, and preserved answer together to infer the user's true intent. Stay conservative. Prefer the narrowest accurate rewrite that matches the answer's actual scope.
+   6. FALLBACK TO HOLD: If you cannot produce a standalone rewritten question that both reads naturally and accurately matches the scope of the preserved answer without semantic drift, you MUST classify the follow-up as 'hold' instead.
 
    EXAMPLES OF REWRITES:
 
    Example 1
-   First question: What's a good place to stay in Singapore?
-   Follow-up: What about shopping there?
-   Bad rewrite: What about shopping in Singapore?
-   Good rewrite: Which areas in Singapore are best for shopping?
+   First question: \"What's the best lounge in Doha for a long layover?\"
+   Follow-up: \"ok but what about that one\"
+   Preserved answer focus: amenities and suitability of the Al Safwa lounge for long layovers
+   Bad rewrite: \"What are the other lounge options in Doha besides the Al Safwa Lounge?\"
+   Why bad: this broadens the question into alternatives when the answer is still centered on Al Safwa itself.
+   Better rewrite: \"What amenities does the Al Safwa First Class Lounge offer for long layovers in Doha?\"
 
    Example 2
-   First question: What's the best lounge in Doha for Qatar Airways business class?
-   Follow-up: How does Al Safwa compare?
-   Bad rewrite: How does Al Safwa compare in Doha?
-   Good rewrite: How does the Al Safwa Lounge compare to other Doha lounge options for Qatar Airways travelers?
+   First question: \"What's a good place to stay in Singapore?\"
+   Follow-up: \"What about shopping there?\"
+   Preserved answer focus: shopping-friendly areas / neighborhoods
+   Bad rewrite: \"What about shopping in Singapore?\"
+   Why bad: too close to the original phrasing, still weak and not very publishable.
+   Better rewrite: \"Which areas in Singapore are best for shopping?\"
 
    Example 3
-   First question: What's the best Hyatt in Tokyo on points?
-   Follow-up: What about for families?
-   Bad rewrite: What about Hyatt in Tokyo for families?
-   Good rewrite: Which Hyatt properties in Tokyo are best for families using points?
+   First question: \"What's the best Hyatt in Tokyo on points?\"
+   Follow-up: \"What about for families?\"
+   Preserved answer focus: family-suitable Hyatt properties in Tokyo
+   Bad rewrite: \"What about Hyatt in Tokyo for families?\"
+   Better rewrite: \"Which Hyatt properties in Tokyo are best for families using points?\"
 
    Example 4
-   First question: Is the Amex Platinum worth it for airport lounge access?
-   Follow-up: What about if I mostly fly domestic?
-   Bad rewrite: What about if I mostly fly domestic with the Amex Platinum?
-   Good rewrite: Is the Amex Platinum still worth it for travelers who mostly fly domestic routes?
+   First question: \"Is the Amex Platinum worth it for airport lounge access?\"
+   Follow-up: \"What about if I mostly fly domestic?\"
+   Preserved answer focus: whether the Amex Platinum still makes sense for mostly domestic travelers
+   Bad rewrite: \"What about if I mostly fly domestic with the Amex Platinum?\"
+   Better rewrite: \"Is the Amex Platinum still worth it for travelers who mostly fly domestic routes?\"
 
 3. Return ONLY a JSON object with keys:
    - classification (string)
@@ -250,7 +254,7 @@ INSTRUCTIONS:
             'timeout' => 20,
             'body'    => wp_json_encode([
                 'model' => 'gpt-4o-mini',
-                'temperature' => 0.4,
+                'temperature' => 0.3,
                 'messages' => [['role' => 'user', 'content' => $prompt]],
                 'response_format' => ['type' => 'json_object']
             ])
