@@ -37,6 +37,56 @@ class MP_QA_CPT_Handler
       10,
       3,
     );
+
+    // Editor Sync Hook
+    add_action("save_post_milepoint_qa", [$this, "sync_editor_content_to_meta"], 10, 3);
+  }
+
+  /**
+   * Syncs the editable post_content back to _mp_single_turn_content['answer']
+   * to keep the normalized meta in sync with editorial changes.
+   */
+  public function sync_editor_content_to_meta($post_id, $post, $update) {
+    // Prevent recursion, autosaves, and revisions
+    if (wp_is_post_autosave($post_id) || wp_is_post_revision($post_id)) {
+      return;
+    }
+
+    // Only process during actual updates, not new post insertions via REST where meta isn't setup yet
+    if (!$update) {
+      return;
+    }
+
+    // Ignore if this is an automated REST API ingest (we only want to sync manual human edits)
+    if (defined('MP_IS_INGESTION_RUNNING') && MP_IS_INGESTION_RUNNING) {
+      return;
+    }
+
+    // Get the updated content
+    $content = $post->post_content;
+
+    // Do not sync if it's the placeholder or empty
+    if (empty(trim($content)) || trim($content) === "<!-- MILEPOINT_LONG_TAIL -->") {
+      return;
+    }
+
+    // Process blocks to strip Gutenberg comments (<!-- wp:freeform -->, etc)
+    // and extract the clean HTML structure
+    $clean_html = trim(do_blocks($content));
+
+    // Retrieve the existing meta
+    $single_turn = get_post_meta($post_id, "_mp_single_turn_content", true);
+
+    if (is_array($single_turn)) {
+      // Only update if there's actually a change to prevent unnecessary writes
+      if ($single_turn['answer'] !== $clean_html) {
+        $single_turn['answer'] = $clean_html;
+        update_post_meta($post_id, "_mp_single_turn_content", $single_turn);
+      }
+
+      // Mark this post as manually edited so future ingest updates won't overwrite the human's work
+      update_post_meta($post_id, "_mp_is_manually_edited", "1");
+    }
   }
 
   /**

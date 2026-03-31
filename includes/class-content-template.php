@@ -157,7 +157,13 @@ class MP_Content_Template
 
     // ANSWER BOX
     $html .= '  <div id="mp-a-0" class="mp-a">';
-    $html .= $answer;
+    // If post_content has been updated to Gutenberg blocks (i.e. not placeholder/empty)
+    // we use $content instead of the meta $answer to reflect manual editor changes.
+    if (!empty(trim($content)) && trim($content) !== '<!-- MILEPOINT_LONG_TAIL -->') {
+        $html .= $content;
+    } else {
+        $html .= $answer;
+    }
     $html .= "  </div>"; // Close Answer Box
 
     // Sources carousel

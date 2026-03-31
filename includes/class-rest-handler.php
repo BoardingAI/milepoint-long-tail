@@ -211,6 +211,11 @@ public function handle_chatbot_ingest($request) {
    */
   public function handle_ingest($request)
   {
+    // Define a flag so the save_post hook knows this is an automated ingest, not a human edit
+    if (!defined('MP_IS_INGESTION_RUNNING')) {
+        define('MP_IS_INGESTION_RUNNING', true);
+    }
+
     $params = $request->get_json_params();
     $thread_id = sanitize_text_field($params["thread_id"] ?? "");
 
@@ -326,9 +331,12 @@ public function handle_chatbot_ingest($request) {
 
       $initial_status = $has_pollution ? "draft" : "future";
 
+      // Wrap the incoming HTML in a Classic block so Gutenberg can edit it faithfully
+      $formatted_content = "<!-- wp:freeform -->\n" . $first_answer_text . "\n<!-- /wp:freeform -->";
+
       $primary_id = wp_insert_post([
         "post_title" => $first_question_text,
-        "post_content" => "<!-- MILEPOINT_LONG_TAIL -->",
+        "post_content" => $formatted_content,
         "post_status" => $initial_status,
         "post_type" => "milepoint_qa",
         "post_date" => $post_date,
@@ -340,17 +348,26 @@ public function handle_chatbot_ingest($request) {
         return new WP_REST_Response(["message" => "Failed to create scheduled post."], 500);
       }
     } else {
+        $update_args = ["ID" => $primary_id];
+
         // Quarantine: If pollution is detected, downgrade status to draft
         if ($has_pollution) {
             $status = get_post_status($primary_id);
             if ($status !== 'draft') {
-                wp_update_post([
-                    "ID" => $primary_id,
-                    "post_status" => 'draft',
-                ]);
+                $update_args["post_status"] = 'draft';
             }
         }
-        // Do NOT push the publish date forward for follow-up turns
+
+        // Update post_content if not manually edited by a human
+        $is_manually_edited = get_post_meta($primary_id, '_mp_is_manually_edited', true);
+        if ($is_manually_edited !== '1') {
+            $formatted_content = "<!-- wp:freeform -->\n" . $first_answer_text . "\n<!-- /wp:freeform -->";
+            $update_args["post_content"] = $formatted_content;
+        }
+
+        if (count($update_args) > 1) {
+            wp_update_post($update_args);
+        }
     }
 
     // Set Primary Post Taxonomy and Meta
@@ -550,9 +567,12 @@ public function handle_chatbot_ingest($request) {
         }
 
         if (!$followup_id) {
+            // Wrap the incoming HTML in a Classic block
+            $formatted_content = "<!-- wp:freeform -->\n" . $a_text . "\n<!-- /wp:freeform -->";
+
             $new_id = wp_insert_post([
               "post_title" => $post_title,
-              "post_content" => "<!-- MILEPOINT_LONG_TAIL -->",
+              "post_content" => $formatted_content,
               "post_status" => $publish_status,
               "post_date" => $post_date,
               "post_date_gmt" => $post_date_gmt,
@@ -570,6 +590,13 @@ public function handle_chatbot_ingest($request) {
                 "ID" => $followup_id,
                 "post_title" => $post_title,
             ];
+
+            // Update post_content if not manually edited by a human
+            $is_manually_edited = get_post_meta($followup_id, '_mp_is_manually_edited', true);
+            if ($is_manually_edited !== '1') {
+                $formatted_content = "<!-- wp:freeform -->\n" . $a_text . "\n<!-- /wp:freeform -->";
+                $update_args["post_content"] = $formatted_content;
+            }
 
             // Only update schedule if it's currently a draft transitioning to a scheduled post,
             // or if we are actively re-scheduling it (avoid resetting manual edits).
