@@ -377,7 +377,8 @@ public function handle_chatbot_ingest($request) {
     update_post_meta($primary_id, "_mp_original_question", $transcript[0]["question"] ?? "");
     update_post_meta($primary_id, "_mp_original_answer", $transcript[0]["answer"] ?? "");
 
-    $this->process_featured_image($primary_id, $transcript);
+    // Process featured image for primary post using only turn 0 sources
+    $this->process_featured_image($primary_id, $transcript[0]["sources"] ?? []);
 
     // 2. PROCESS FOLLOW-UP TURNS
     $api_key = get_option('mp_openai_api_key');
@@ -659,9 +660,13 @@ public function handle_chatbot_ingest($request) {
                   update_post_meta($followup_id, "_mp_single_turn_content", $existing_single);
               }
           }
+
+          // Process featured image for follow-up post using only its own sources
+          $this->process_featured_image($followup_id, $turn["sources"] ?? []);
       }
 
-      $prior_context_arr[] = "Q: " . $clean_q . "\nA: " . wp_strip_all_tags($a_text);    }
+      $prior_context_arr[] = "Q: " . $clean_q . "\nA: " . wp_strip_all_tags($a_text);
+    }
 
     return new WP_REST_Response(
       ["message" => "Post and follow-ups updated with sources.", "primary_id" => $primary_id],
@@ -670,23 +675,21 @@ public function handle_chatbot_ingest($request) {
   }
 
   /**
-   * Process and attach a featured image from sources
+   * Process and attach a featured image from a single turn's sources
    */
-  private function process_featured_image($post_id, $transcript)
+  private function process_featured_image($post_id, $turn_sources)
   {
     // Check if post already has a featured image
     if (has_post_thumbnail($post_id)) {
       return;
     }
 
-    // Extract all source URLs
+    // Extract all source URLs for this specific turn
     $sources = [];
-    foreach ($transcript as $block) {
-      if (!empty($block["sources"]) && is_array($block["sources"])) {
-        foreach ($block["sources"] as $source) {
-          if (!empty($source["url"])) {
-            $sources[] = $source["url"];
-          }
+    if (!empty($turn_sources) && is_array($turn_sources)) {
+      foreach ($turn_sources as $source) {
+        if (!empty($source["url"])) {
+          $sources[] = $source["url"];
         }
       }
     }
