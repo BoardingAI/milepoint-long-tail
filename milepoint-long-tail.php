@@ -265,3 +265,12 @@ function mp_format_category_counts_html($output, $args) {
     }
     return $output;
 }
+
+/**
+ * Includes editor styles
+ */
+function mp_add_editor_styles() {
+    $url = plugins_url( 'mp-editor-styles.css', __FILE__ );
+    add_editor_style( $url );
+}
+add_action( 'init', 'mp_add_editor_styles' );

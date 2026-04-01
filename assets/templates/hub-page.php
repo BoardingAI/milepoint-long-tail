@@ -108,8 +108,7 @@ $base_url     = get_post_type_archive_link('milepoint_qa') ?: home_url('/questio
             <article class="mp-hub-card">
               <a class="mp-entry-link" href="<?php the_permalink(); ?>"></a>
               <?php if (has_post_thumbnail()) : the_post_thumbnail('medium_large', array('class' => 'mp-card-image')); ?>
-              <?php else : ?>
-                <div class="mp-placeholder">MilePoint Q&A</div>
+              <?php else : echo wp_get_attachment_image( 140, 'medium_large', false, array('class' => 'mp-card-image')); ?>
               <?php endif; ?>
               <div class="mp-card-content">
                 <span class="mp-card-cat"><?php echo get_the_category()[0]->name ?? 'General'; ?></span>
