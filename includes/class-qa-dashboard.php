@@ -275,10 +275,40 @@ class MP_QA_Dashboard {
             // Fallback for older posts without single_turn meta
             if (empty($single_turn) || !isset($single_turn['answer'])) {
                 $transcript = get_post_meta($post_id, '_raw_transcript', true);
-                if (is_array($transcript) && !empty($transcript)) {
-                    $answer_html = $transcript[0]['answer'] ?? '';
+
+                // Determine the correct turn index for this post
+                $turn_index = get_post_meta($post_id, '_mp_source_turn_index', true);
+
+                // If it's a legacy primary post it might not have the turn index explicitly saved
+                if ($turn_index === '') {
+                    $is_primary = get_post_meta($post_id, '_mp_is_primary_turn', true);
+                    if ($is_primary === '1') {
+                        $turn_index = 0;
+                    } else {
+                        // We can't safely guess follow-up indexes if both meta fields are missing.
+                        // However, early legacy posts were almost exclusively primary turns (index 0).
+                        $turn_index = 0;
+                    }
                 } else {
-                    continue; // Skip if we truly have no answer
+                    $turn_index = (int)$turn_index;
+                }
+
+                if (is_array($transcript) && isset($transcript[$turn_index])) {
+                    $turn_data = $transcript[$turn_index];
+                    $answer_html = $turn_data['answer'] ?? '';
+
+                    // Hydrate the missing single_turn meta so the frontend has structural data
+                    $single_turn = [
+                        'question' => $turn_data['question'] ?? get_the_title($post_id),
+                        'answer' => $answer_html,
+                        'sources' => $turn_data['sources'] ?? [],
+                        'breakdown' => $turn_data['breakdown'] ?? get_post_meta($post_id, '_breakdown', true) ?: [],
+                        'is_rewritten' => false // Legacy fallback assumption
+                    ];
+                    update_post_meta($post_id, '_mp_single_turn_content', $single_turn);
+
+                } else {
+                    continue; // Skip if we truly have no transcript or the index is out of bounds
                 }
             } else {
                 $answer_html = $single_turn['answer'];
@@ -291,12 +321,15 @@ class MP_QA_Dashboard {
             // Wrap in Freeform block
             $formatted_content = "<!-- wp:freeform -->\n" . $answer_html . "\n<!-- /wp:freeform -->";
 
-            // Update directly to bypass loops/hooks
+            // Update directly to bypass heavy hooks/loops, but crucially we MUST clear the cache
             $wpdb->update(
                 $wpdb->posts,
                 ['post_content' => $formatted_content],
                 ['ID' => $post_id]
             );
+
+            // Without this, Gutenberg and the frontend will continue serving the cached placeholder string
+            clean_post_cache($post_id);
 
             $migrated_count++;
         }
