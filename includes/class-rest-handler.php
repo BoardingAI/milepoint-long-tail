@@ -390,6 +390,15 @@ public function handle_chatbot_ingest($request) {
       "breakdown" => $transcript[0]["breakdown"] ?? $breakdown, // fallback to overall breakdown if missing per-turn
       "is_rewritten" => false
     ];
+
+    // If manually edited, preserve the editorial answer in the single turn meta to prevent drift
+    if (isset($is_manually_edited) && $is_manually_edited === '1') {
+        $existing_primary_single = get_post_meta($primary_id, "_mp_single_turn_content", true);
+        if (is_array($existing_primary_single) && isset($existing_primary_single['answer'])) {
+            $primary_single_turn['answer'] = $existing_primary_single['answer'];
+        }
+    }
+
     update_post_meta($primary_id, "_mp_single_turn_content", $primary_single_turn);
     update_post_meta($primary_id, "_mp_original_question", $transcript[0]["question"] ?? "");
     update_post_meta($primary_id, "_mp_original_answer", $transcript[0]["answer"] ?? "");
@@ -445,6 +454,7 @@ public function handle_chatbot_ingest($request) {
 
       $needs_ai = false;
       $is_currently_streaming = isset($turn['is_streaming']) && $turn['is_streaming'] === true;
+      $is_manually_edited = false;
 
       if (!$followup_id) {
           $needs_ai = true;
@@ -673,13 +683,24 @@ public function handle_chatbot_ingest($request) {
                 "breakdown" => $turn["breakdown"] ?? [],
                 "is_rewritten" => !empty($rewritten_q)
               ];
+
+              if (isset($is_manually_edited) && $is_manually_edited === '1') {
+                  $existing_single = get_post_meta($followup_id, "_mp_single_turn_content", true);
+                  if (is_array($existing_single) && isset($existing_single['answer'])) {
+                      $single_turn['answer'] = $existing_single['answer'];
+                  }
+              }
+
               update_post_meta($followup_id, "_mp_single_turn_content", $single_turn);
           } else {
               $existing_single = get_post_meta($followup_id, "_mp_single_turn_content", true);
               if (is_array($existing_single)) {
-                  // We always use the original captured answer, even if the question was rewritten previously.
+                  // We always use the original captured answer, unless the human editor has altered it
+                  if (!isset($is_manually_edited) || $is_manually_edited !== '1') {
+                      $existing_single["answer"] = $a_text;
+                  }
+
                   // We update sources and breakdown to catch streamed arrivals.
-                  $existing_single["answer"] = $a_text;
                   $existing_single["sources"] = $turn["sources"] ?? [];
                   if (isset($turn["breakdown"])) {
                       $existing_single["breakdown"] = $turn["breakdown"];
