@@ -211,6 +211,11 @@ public function handle_chatbot_ingest($request) {
    */
   public function handle_ingest($request)
   {
+    // Define a flag so the save_post hook knows this is an automated ingest, not a human edit
+    if (!defined('MP_IS_INGESTION_RUNNING')) {
+        define('MP_IS_INGESTION_RUNNING', true);
+    }
+
     $params = $request->get_json_params();
     $thread_id = sanitize_text_field($params["thread_id"] ?? "");
 
@@ -326,9 +331,12 @@ public function handle_chatbot_ingest($request) {
 
       $initial_status = $has_pollution ? "draft" : "future";
 
+      // Wrap the incoming HTML in a Classic block so Gutenberg can edit it faithfully
+      $formatted_content = "<!-- wp:freeform -->\n" . $first_answer_text . "\n<!-- /wp:freeform -->";
+
       $primary_id = wp_insert_post([
         "post_title" => $first_question_text,
-        "post_content" => "<!-- MILEPOINT_LONG_TAIL -->",
+        "post_content" => $formatted_content,
         "post_status" => $initial_status,
         "post_type" => "milepoint_qa",
         "post_date" => $post_date,
@@ -340,17 +348,26 @@ public function handle_chatbot_ingest($request) {
         return new WP_REST_Response(["message" => "Failed to create scheduled post."], 500);
       }
     } else {
+        $update_args = ["ID" => $primary_id];
+
         // Quarantine: If pollution is detected, downgrade status to draft
         if ($has_pollution) {
             $status = get_post_status($primary_id);
             if ($status !== 'draft') {
-                wp_update_post([
-                    "ID" => $primary_id,
-                    "post_status" => 'draft',
-                ]);
+                $update_args["post_status"] = 'draft';
             }
         }
-        // Do NOT push the publish date forward for follow-up turns
+
+        // Update post_content if not manually edited by a human
+        $is_manually_edited = get_post_meta($primary_id, '_mp_is_manually_edited', true);
+        if ($is_manually_edited !== '1') {
+            $formatted_content = "<!-- wp:freeform -->\n" . $first_answer_text . "\n<!-- /wp:freeform -->";
+            $update_args["post_content"] = $formatted_content;
+        }
+
+        if (count($update_args) > 1) {
+            wp_update_post($update_args);
+        }
     }
 
     // Set Primary Post Taxonomy and Meta
@@ -373,6 +390,15 @@ public function handle_chatbot_ingest($request) {
       "breakdown" => $transcript[0]["breakdown"] ?? $breakdown, // fallback to overall breakdown if missing per-turn
       "is_rewritten" => false
     ];
+
+    // If manually edited, preserve the editorial answer in the single turn meta to prevent drift
+    if (isset($is_manually_edited) && $is_manually_edited === '1') {
+        $existing_primary_single = get_post_meta($primary_id, "_mp_single_turn_content", true);
+        if (is_array($existing_primary_single) && isset($existing_primary_single['answer'])) {
+            $primary_single_turn['answer'] = $existing_primary_single['answer'];
+        }
+    }
+
     update_post_meta($primary_id, "_mp_single_turn_content", $primary_single_turn);
     update_post_meta($primary_id, "_mp_original_question", $transcript[0]["question"] ?? "");
     update_post_meta($primary_id, "_mp_original_answer", $transcript[0]["answer"] ?? "");
@@ -428,6 +454,7 @@ public function handle_chatbot_ingest($request) {
 
       $needs_ai = false;
       $is_currently_streaming = isset($turn['is_streaming']) && $turn['is_streaming'] === true;
+      $is_manually_edited = false;
 
       if (!$followup_id) {
           $needs_ai = true;
@@ -550,9 +577,12 @@ public function handle_chatbot_ingest($request) {
         }
 
         if (!$followup_id) {
+            // Wrap the incoming HTML in a Classic block
+            $formatted_content = "<!-- wp:freeform -->\n" . $a_text . "\n<!-- /wp:freeform -->";
+
             $new_id = wp_insert_post([
               "post_title" => $post_title,
-              "post_content" => "<!-- MILEPOINT_LONG_TAIL -->",
+              "post_content" => $formatted_content,
               "post_status" => $publish_status,
               "post_date" => $post_date,
               "post_date_gmt" => $post_date_gmt,
@@ -570,6 +600,13 @@ public function handle_chatbot_ingest($request) {
                 "ID" => $followup_id,
                 "post_title" => $post_title,
             ];
+
+            // Update post_content if not manually edited by a human
+            $is_manually_edited = get_post_meta($followup_id, '_mp_is_manually_edited', true);
+            if ($is_manually_edited !== '1') {
+                $formatted_content = "<!-- wp:freeform -->\n" . $a_text . "\n<!-- /wp:freeform -->";
+                $update_args["post_content"] = $formatted_content;
+            }
 
             // Only update schedule if it's currently a draft transitioning to a scheduled post,
             // or if we are actively re-scheduling it (avoid resetting manual edits).
@@ -646,13 +683,24 @@ public function handle_chatbot_ingest($request) {
                 "breakdown" => $turn["breakdown"] ?? [],
                 "is_rewritten" => !empty($rewritten_q)
               ];
+
+              if (isset($is_manually_edited) && $is_manually_edited === '1') {
+                  $existing_single = get_post_meta($followup_id, "_mp_single_turn_content", true);
+                  if (is_array($existing_single) && isset($existing_single['answer'])) {
+                      $single_turn['answer'] = $existing_single['answer'];
+                  }
+              }
+
               update_post_meta($followup_id, "_mp_single_turn_content", $single_turn);
           } else {
               $existing_single = get_post_meta($followup_id, "_mp_single_turn_content", true);
               if (is_array($existing_single)) {
-                  // We always use the original captured answer, even if the question was rewritten previously.
+                  // We always use the original captured answer, unless the human editor has altered it
+                  if (!isset($is_manually_edited) || $is_manually_edited !== '1') {
+                      $existing_single["answer"] = $a_text;
+                  }
+
                   // We update sources and breakdown to catch streamed arrivals.
-                  $existing_single["answer"] = $a_text;
                   $existing_single["sources"] = $turn["sources"] ?? [];
                   if (isset($turn["breakdown"])) {
                       $existing_single["breakdown"] = $turn["breakdown"];

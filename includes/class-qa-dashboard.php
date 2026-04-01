@@ -8,6 +8,7 @@ class MP_QA_Dashboard {
     public function __construct() {
         add_action('admin_menu', [$this, 'add_dashboard_menu'], 20);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_assets']);
+        add_action('wp_ajax_mp_migrate_legacy_posts', [$this, 'ajax_migrate_legacy_posts']);
     }
 
     public function add_dashboard_menu() {
@@ -72,8 +73,15 @@ class MP_QA_Dashboard {
 
             <div style="display: flex; gap: 20px; margin-top: 20px;">
 
-                <!-- LEFT SIDEBAR: Filters -->
+                <!-- LEFT SIDEBAR: Filters & Tools -->
                 <div style="width: 260px; flex-shrink: 0;">
+                    <div style="background: #fff; border: 1px solid #ccd0d4; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                        <h3 style="margin-top:0;">Editorial Migration</h3>
+                        <p style="font-size: 13px; color: #666;">Convert legacy placeholder posts to editable Gutenberg blocks.</p>
+                        <button type="button" id="mp-trigger-migration" class="button button-secondary" style="width:100%; text-align:center;">Migrate Legacy Posts</button>
+                        <div id="mp-migration-status" style="margin-top: 10px; font-size: 12px; color: #d63638; display: none;"></div>
+                    </div>
+
                     <div style="background: #fff; border: 1px solid #ccd0d4; padding: 15px; border-radius: 4px;">
                         <form method="GET" action="edit.php">
                             <input type="hidden" name="post_type" value="milepoint_qa">
@@ -162,6 +170,54 @@ class MP_QA_Dashboard {
 
         <script>
         document.addEventListener('DOMContentLoaded', function() {
+            // Migration tool JS
+            const migrateBtn = document.getElementById('mp-trigger-migration');
+            const statusDiv = document.getElementById('mp-migration-status');
+
+            if (migrateBtn) {
+                migrateBtn.addEventListener('click', function() {
+                    if (!confirm('This will convert all legacy empty posts into editable Gutenberg blocks. Proceed?')) {
+                        return;
+                    }
+
+                    migrateBtn.disabled = true;
+                    migrateBtn.textContent = 'Migrating...';
+                    statusDiv.style.display = 'block';
+                    statusDiv.style.color = '#2271b1';
+                    statusDiv.textContent = 'Processing...';
+
+                    fetch(ajaxurl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: new URLSearchParams({
+                            action: 'mp_migrate_legacy_posts',
+                            nonce: '<?php echo wp_create_nonce("mp_migrate_legacy_posts_nonce"); ?>'
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        migrateBtn.disabled = false;
+                        migrateBtn.textContent = 'Migrate Legacy Posts';
+                        if (data.success) {
+                            statusDiv.style.color = '#00a32a';
+                            statusDiv.textContent = 'Success: ' + data.data.migrated + ' posts migrated.';
+                        } else {
+                            statusDiv.style.color = '#d63638';
+                            statusDiv.textContent = 'Error: ' + (data.data || 'Unknown error');
+                        }
+                    })
+                    .catch(error => {
+                        migrateBtn.disabled = false;
+                        migrateBtn.textContent = 'Migrate Legacy Posts';
+                        statusDiv.style.color = '#d63638';
+                        statusDiv.textContent = 'Request failed.';
+                    });
+                });
+            }
+
+            // Chart JS
             const ctx = document.getElementById('qaChart').getContext('2d');
             new Chart(ctx, {
                 type: 'line',
@@ -186,5 +242,98 @@ class MP_QA_Dashboard {
         });
         </script>
         <?php
+    }
+
+    /**
+     * AJAX handler to migrate legacy placeholder posts to Gutenberg blocks.
+     */
+    public function ajax_migrate_legacy_posts() {
+        check_ajax_referer('mp_migrate_legacy_posts_nonce', 'nonce');
+
+        if (!current_user_can('edit_posts')) {
+            wp_send_json_error('Insufficient permissions');
+        }
+
+        global $wpdb;
+
+        // Find posts with the exact placeholder or completely empty
+        $posts_to_migrate = $wpdb->get_col("
+            SELECT ID FROM {$wpdb->posts}
+            WHERE post_type = 'milepoint_qa'
+            AND (post_content = '<!-- MILEPOINT_LONG_TAIL -->' OR post_content = '')
+        ");
+
+        if (empty($posts_to_migrate)) {
+            wp_send_json_success(['migrated' => 0]);
+        }
+
+        $migrated_count = 0;
+
+        foreach ($posts_to_migrate as $post_id) {
+            $single_turn = get_post_meta($post_id, '_mp_single_turn_content', true);
+
+            // Fallback for older posts without single_turn meta
+            if (empty($single_turn) || !isset($single_turn['answer'])) {
+                $transcript = get_post_meta($post_id, '_raw_transcript', true);
+
+                // Determine the correct turn index for this post
+                $turn_index = get_post_meta($post_id, '_mp_source_turn_index', true);
+
+                // If it's a legacy primary post it might not have the turn index explicitly saved
+                if ($turn_index === '') {
+                    $is_primary = get_post_meta($post_id, '_mp_is_primary_turn', true);
+                    if ($is_primary === '1') {
+                        $turn_index = 0;
+                    } else {
+                        // We can't safely guess follow-up indexes if both meta fields are missing.
+                        // However, early legacy posts were almost exclusively primary turns (index 0).
+                        $turn_index = 0;
+                    }
+                } else {
+                    $turn_index = (int)$turn_index;
+                }
+
+                if (is_array($transcript) && isset($transcript[$turn_index])) {
+                    $turn_data = $transcript[$turn_index];
+                    $answer_html = $turn_data['answer'] ?? '';
+
+                    // Hydrate the missing single_turn meta so the frontend has structural data
+                    $single_turn = [
+                        'question' => $turn_data['question'] ?? get_the_title($post_id),
+                        'answer' => $answer_html,
+                        'sources' => $turn_data['sources'] ?? [],
+                        'breakdown' => $turn_data['breakdown'] ?? get_post_meta($post_id, '_breakdown', true) ?: [],
+                        'is_rewritten' => false // Legacy fallback assumption
+                    ];
+                    update_post_meta($post_id, '_mp_single_turn_content', $single_turn);
+
+                } else {
+                    continue; // Skip if we truly have no transcript or the index is out of bounds
+                }
+            } else {
+                $answer_html = $single_turn['answer'];
+            }
+
+            if (empty($answer_html)) {
+                continue;
+            }
+
+            // Wrap in Freeform block
+            $formatted_content = "<!-- wp:freeform -->\n" . $answer_html . "\n<!-- /wp:freeform -->";
+
+            // Update directly to bypass heavy hooks/loops, but crucially we MUST clear the cache
+            $wpdb->update(
+                $wpdb->posts,
+                ['post_content' => $formatted_content],
+                ['ID' => $post_id]
+            );
+
+            // Without this, Gutenberg and the frontend will continue serving the cached placeholder string
+            clean_post_cache($post_id);
+
+            $migrated_count++;
+        }
+
+        wp_send_json_success(['migrated' => $migrated_count]);
     }
 }
