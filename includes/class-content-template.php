@@ -119,8 +119,7 @@ class MP_Content_Template
     $is_primary_meta = get_post_meta($post_id, "_mp_is_primary_turn", true);
     $is_primary = $is_primary_meta === '' || $is_primary_meta === "1"; // Handle empty (legacy) or explicitly "1" as primary
 
-    $html = '<div id="mp-hover-card"></div>';
-    $html .= '<div class="mp-qa-container">';
+    $html = '<div class="mp-qa-container">';
 
     $question = $this->clean_lit_comments($single_turn["question"] ?? "");
     $answer = $this->clean_lit_comments($single_turn["answer"] ?? "");
@@ -181,7 +180,7 @@ class MP_Content_Template
     }
 
     // ANSWER BOX
-    $html .= '  <section id="mp-a-0" class="mp-a mp-answer-section">';
+    $html .= '  <div id="mp-a-0" class="mp-a mp-answer-section">';
     // If post_content has been updated to Gutenberg blocks (i.e. not placeholder/empty)
     // we use $content instead of the meta $answer to reflect manual editor changes.
     if (!empty(trim($content)) && trim($content) !== '<!-- MILEPOINT_LONG_TAIL -->') {
@@ -189,7 +188,7 @@ class MP_Content_Template
     } else {
         $html .= $answer;
     }
-    $html .= "  </section>"; // Close Answer Box
+    $html .= "  </div>"; // Close Answer Box
 
     // Sources carousel
     if (!empty($sources)) {
@@ -223,7 +222,7 @@ class MP_Content_Template
       $html .=
         '<div class="mp-related-box">';
       $html .=
-        '  <h4 class="mp-related-header">Related Questions</h4>';
+        '  <h2 class="mp-related-header">Related Questions</h2>';
       $html .=
         '  <div class="mp-related-list">';
 
@@ -246,6 +245,8 @@ class MP_Content_Template
     }
 
     $html .= "</div>";
+
+    $html .= '<div id="mp-hover-card"></div>';
 
     return $html;
   }
