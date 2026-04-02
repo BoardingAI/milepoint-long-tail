@@ -122,12 +122,12 @@ class MP_Content_Template
     $html = '<div id="mp-hover-card"></div>';
     $html .= '<div class="mp-qa-container">';
 
-    // Emit the single turn array into the DOM for hover JS dependencies
-    $html .= '<script type="application/json" id="mp-qa-content">' . wp_json_encode([$single_turn]) . "</script>";
-
     $question = $this->clean_lit_comments($single_turn["question"] ?? "");
     $answer = $this->clean_lit_comments($single_turn["answer"] ?? "");
     $sources = $single_turn["sources"] ?? [];
+
+    // Emit only the sources array into the DOM for hover JS dependencies to reduce JSON bloat
+    $html .= '<script type="application/json" id="mp-qa-content">' . wp_json_encode([['sources' => $sources]]) . "</script>";
 
     $html .= '<div class="mp-qa-row">';
 
@@ -156,7 +156,7 @@ class MP_Content_Template
     }
 
     // ANSWER BOX
-    $html .= '  <div id="mp-a-0" class="mp-a">';
+    $html .= '  <section id="mp-a-0" class="mp-a mp-answer-section">';
     // If post_content has been updated to Gutenberg blocks (i.e. not placeholder/empty)
     // we use $content instead of the meta $answer to reflect manual editor changes.
     if (!empty(trim($content)) && trim($content) !== '<!-- MILEPOINT_LONG_TAIL -->') {
@@ -164,11 +164,11 @@ class MP_Content_Template
     } else {
         $html .= $answer;
     }
-    $html .= "  </div>"; // Close Answer Box
+    $html .= "  </section>"; // Close Answer Box
 
     // Sources carousel
     if (!empty($sources)) {
-      $html .= '<div class="mp-sources-wrapper">';
+      $html .= '<aside class="mp-sources-wrapper">';
       foreach ($sources as $source) {
         if (!isset($source["url"]) || !isset($source["title"])) continue;
 
@@ -188,7 +188,7 @@ class MP_Content_Template
         }
         $html .= "</a>";
       }
-      $html .= "</div>";
+      $html .= "</aside>";
     }
 
     $html .= "</div>"; // Close Row

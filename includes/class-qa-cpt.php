@@ -386,6 +386,13 @@ class MP_QA_CPT_Handler
 
   public function force_hub_layout($template)
   {
+    if (is_singular('milepoint_qa')) {
+      $custom_template =
+        plugin_dir_path(__DIR__) . "assets/templates/single-qa.php";
+      if (file_exists($custom_template)) {
+        return $custom_template;
+      }
+    }
     if (is_post_type_archive("milepoint_qa")) {
       $custom_template =
         plugin_dir_path(__DIR__) . "assets/templates/hub-page.php";
