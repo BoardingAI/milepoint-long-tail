@@ -119,15 +119,39 @@ class MP_Content_Template
     $is_primary_meta = get_post_meta($post_id, "_mp_is_primary_turn", true);
     $is_primary = $is_primary_meta === '' || $is_primary_meta === "1"; // Handle empty (legacy) or explicitly "1" as primary
 
-    $html = '<div id="mp-hover-card"></div>';
-    $html .= '<div class="mp-qa-container">';
-
-    // Emit the single turn array into the DOM for hover JS dependencies
-    $html .= '<script type="application/json" id="mp-qa-content">' . wp_json_encode([$single_turn]) . "</script>";
+    $html = '<div class="mp-qa-container">';
 
     $question = $this->clean_lit_comments($single_turn["question"] ?? "");
     $answer = $this->clean_lit_comments($single_turn["answer"] ?? "");
     $sources = $single_turn["sources"] ?? [];
+
+    // Extract actual citations from the answer text to further reduce JSON bloat
+    $cited_sources = [];
+    if (preg_match_all('/class="[^"]*gist-chat-citation[^"]*".*?>([^<]+)</i', $answer, $matches)) {
+        // The matches[1] array contains the text content of the citation pills
+        $cited_sources = array_map('trim', $matches[1]);
+        $cited_sources = array_unique($cited_sources);
+    }
+
+    // Strip out unnecessary AI metadata and filter down to ONLY cited sources
+    $lean_sources = [];
+    foreach ($sources as $s) {
+        $source_name = $s['source'] ?? '';
+        // Only include this source in the JS payload if it's actually cited in the text
+        // (Hover JS only attaches to cited pills, so the rest is dead weight in JSON)
+        if (!empty($source_name) && in_array(trim($source_name), $cited_sources, true)) {
+            $lean_sources[] = [
+                'source'  => $source_name,
+                'url'     => $s['url'] ?? '',
+                'favicon' => $s['favicon'] ?? '',
+                'title'   => $s['title'] ?? '',
+                'excerpt' => $s['excerpt'] ?? ''
+            ];
+        }
+    }
+
+    // Emit only the lean, cited sources array into the DOM for hover JS dependencies
+    $html .= '<script type="application/json" id="mp-qa-content">' . wp_json_encode([['sources' => $lean_sources]]) . "</script>";
 
     $html .= '<div class="mp-qa-row">';
 
@@ -156,7 +180,7 @@ class MP_Content_Template
     }
 
     // ANSWER BOX
-    $html .= '  <div id="mp-a-0" class="mp-a">';
+    $html .= '  <div id="mp-a-0" class="mp-a mp-answer-section">';
     // If post_content has been updated to Gutenberg blocks (i.e. not placeholder/empty)
     // we use $content instead of the meta $answer to reflect manual editor changes.
     if (!empty(trim($content)) && trim($content) !== '<!-- MILEPOINT_LONG_TAIL -->') {
@@ -168,7 +192,7 @@ class MP_Content_Template
 
     // Sources carousel
     if (!empty($sources)) {
-      $html .= '<div class="mp-sources-wrapper">';
+      $html .= '<aside class="mp-sources-wrapper">';
       foreach ($sources as $source) {
         if (!isset($source["url"]) || !isset($source["title"])) continue;
 
@@ -188,7 +212,7 @@ class MP_Content_Template
         }
         $html .= "</a>";
       }
-      $html .= "</div>";
+      $html .= "</aside>";
     }
 
     $html .= "</div>"; // Close Row
@@ -198,7 +222,7 @@ class MP_Content_Template
       $html .=
         '<div class="mp-related-box">';
       $html .=
-        '  <h4 class="mp-related-header">Related Questions</h4>';
+        '  <h2 class="mp-related-header">Related Questions</h2>';
       $html .=
         '  <div class="mp-related-list">';
 
@@ -221,6 +245,8 @@ class MP_Content_Template
     }
 
     $html .= "</div>";
+
+    $html .= '<div id="mp-hover-card"></div>';
 
     return $html;
   }
