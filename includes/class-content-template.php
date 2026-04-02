@@ -126,8 +126,19 @@ class MP_Content_Template
     $answer = $this->clean_lit_comments($single_turn["answer"] ?? "");
     $sources = $single_turn["sources"] ?? [];
 
-    // Emit only the sources array into the DOM for hover JS dependencies to reduce JSON bloat
-    $html .= '<script type="application/json" id="mp-qa-content">' . wp_json_encode([['sources' => $sources]]) . "</script>";
+    // Strip out unnecessary AI metadata/full-text from sources to prevent JSON bloat
+    $lean_sources = array_map(function($s) {
+        return [
+            'source'  => $s['source'] ?? '',
+            'url'     => $s['url'] ?? '',
+            'favicon' => $s['favicon'] ?? '',
+            'title'   => $s['title'] ?? '',
+            'excerpt' => $s['excerpt'] ?? ''
+        ];
+    }, $sources);
+
+    // Emit only the lean sources array into the DOM for hover JS dependencies
+    $html .= '<script type="application/json" id="mp-qa-content">' . wp_json_encode([['sources' => $lean_sources]]) . "</script>";
 
     $html .= '<div class="mp-qa-row">';
 
